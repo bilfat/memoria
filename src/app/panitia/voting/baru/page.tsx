@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AdminShell } from '@/components/admin/AdminShell';
+import { CandidatePhotoUpload } from '@/components/admin/CandidatePhotoUpload';
 import { votingAdapter } from '@/data/adapters';
 import { useToast } from '@/components/ui/Toast';
 import { ArrowLeft, Plus, Trash, FloppyDisk, Sparkle } from '@phosphor-icons/react';
@@ -222,15 +223,10 @@ export default function CreateVotingPage() {
                       />
                     </div>
                     <div>
-                      <label className="block font-semibold text-[#4B5563] mb-1">
-                        URL FOTO TRANSPARAN
-                      </label>
-                      <input
-                        type="text"
-                        value={cand.photo}
-                        onChange={(e) => handleUpdateCandidate(idx, 'photo', e.target.value)}
-                        placeholder="/images/candidate-transparent.png"
-                        className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] bg-white focus:outline-none"
+                      <CandidatePhotoUpload
+                        photo={cand.photo}
+                        onChange={(dataUrl) => handleUpdateCandidate(idx, 'photo', dataUrl)}
+                        onRemove={() => handleUpdateCandidate(idx, 'photo', '')}
                       />
                     </div>
                   </div>

@@ -4,6 +4,7 @@ import React, { use, useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AdminShell } from '@/components/admin/AdminShell';
+import { CandidatePhotoUpload } from '@/components/admin/CandidatePhotoUpload';
 import { votingAdapter } from '@/data/adapters';
 import { useToast } from '@/components/ui/Toast';
 import { Voting, Candidate } from '@/types';
@@ -358,14 +359,11 @@ function EditVotingContent({ params }: { params: Promise<{ id: string }> }) {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-neutral-600">URL Foto (PNG/WebP)</label>
-                      <input
-                        type="text"
+                      <CandidatePhotoUpload
+                        photo={cand.photo}
                         disabled={isLocked}
-                        value={cand.photo}
-                        onChange={(e) => handleUpdateCandidate(idx, 'photo', e.target.value)}
-                        placeholder="/images/kandidat1.png"
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-300 bg-white disabled:bg-neutral-100 disabled:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                        onChange={(dataUrl) => handleUpdateCandidate(idx, 'photo', dataUrl)}
+                        onRemove={() => handleUpdateCandidate(idx, 'photo', '')}
                       />
                     </div>
                   </div>

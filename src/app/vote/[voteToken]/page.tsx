@@ -77,6 +77,19 @@ function PrivateVotingContent({
     }
   };
 
+  const handleUseDemoAccount = async (nim = '7708220001', code = 'VOTE-7K92P') => {
+    setNimInput(nim);
+    setVoteCodeInput(code);
+    setVerificationError(null);
+    try {
+      const res = await votingAdapter.verifyVoter(voteToken, nim, code);
+      setVerifiedVoter(res.participant);
+      setAlreadyVoted(res.alreadyVoted);
+    } catch (err: any) {
+      setVerificationError(err.message || 'Verifikasi akun demo gagal.');
+    }
+  };
+
   const handleNext = () => {
     if (candidates.length === 0) return;
     const nextIdx = (currentIndex + 1) % candidates.length;
@@ -223,6 +236,22 @@ function PrivateVotingContent({
                     >
                       Verifikasi & Masuk Panggung Voting
                     </button>
+
+                    {/* DEMO FAST-ACCESS BUTTON */}
+                    <div className="pt-3 border-t border-memoria-gold/25 flex flex-col items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleUseDemoAccount('7708220001', 'VOTE-7K92P')}
+                        className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#8a601e]/30 via-[#d6b46a]/35 to-[#8a601e]/30 hover:from-[#8a601e]/50 hover:to-[#8a601e]/50 border border-[#f5d890]/60 text-[#fef08a] font-mono text-xs font-semibold tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-98"
+                        title="Klik untuk langsung verifikasi dan masuk menggunakan tiket demo resmi"
+                      >
+                        <Sparkle size={15} weight="fill" className="text-amber-300" />
+                        <span>DEMO: Masuk Otomatis Tiket Mahasiswa</span>
+                      </button>
+                      <span className="text-[10px] text-memoria-champagne/60 font-mono tracking-tight text-center">
+                        Akun Uji Coba: NIM 7708220001 • Kode: VOTE-7K92P (Andi Pratama)
+                      </span>
+                    </div>
                   </form>
                 </div>
               ) : (

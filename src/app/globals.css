@@ -32,6 +32,12 @@
   --font-sans: var(--font-dm-sans), Arial, sans-serif;
 }
 
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--memoria-midnight);

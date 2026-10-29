@@ -47,6 +47,21 @@ function LecturerInvitationContent({
     });
   }, [inviteToken]);
 
+  // Preview opening state untuk visual testing
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('previewOpening=1') && !loading && lecturer) {
+      setEnvelopeState('OPENING');
+      if (sealRef.current) sealRef.current.style.opacity = '0';
+      if (flapRef.current) {
+        gsap.set(flapRef.current, { rotateX: 180, transformOrigin: 'top center' });
+        flapRef.current.style.zIndex = '5';
+      }
+      if (letterRef.current) {
+        gsap.set(letterRef.current, { y: -125, scale: 1.03 });
+      }
+    }
+  }, [loading, lecturer]);
+
   const handleOpenEnvelope = () => {
     if (envelopeState !== 'CLOSED') return;
     setEnvelopeState('OPENING');
@@ -59,33 +74,45 @@ function LecturerInvitationContent({
 
     const tl = gsap.timeline({
       onComplete: () => {
-        setEnvelopeState('OPENED');
+        setTimeout(() => {
+          setEnvelopeState('OPENED');
+        }, 700);
       },
     });
 
     // 1. Seal pulses and fades
-    tl.to(sealRef.current, { scale: 1.25, opacity: 0, duration: 0.4, ease: 'power2.out' })
+    tl.to(sealRef.current, { scale: 1.25, opacity: 0, duration: 0.35, ease: 'power2.out' })
       // 2. Flap rotates open upwards
       .to(
         flapRef.current,
         {
           rotateX: 180,
-          duration: 0.8,
+          duration: 0.75,
           ease: 'power2.inOut',
           transformOrigin: 'top center',
+          onUpdate: function () {
+            // Begitu penutup terlipat ke atas lebih dari 90 derajat, turunkan z-index ke belakang surat (z-5)
+            if (flapRef.current) {
+              if (this.progress() >= 0.45) {
+                flapRef.current.style.zIndex = '5';
+              } else {
+                flapRef.current.style.zIndex = '30';
+              }
+            }
+          },
         },
         '-=0.1'
       )
-      // 3. Letter slides up out of envelope pocket
+      // 3. Letter slides up out of envelope pocket IN FRONT OF the flap
       .to(
         letterRef.current,
         {
-          y: -180,
-          scale: 1.05,
-          duration: 0.9,
+          y: -125,
+          scale: 1.03,
+          duration: 0.85,
           ease: 'power3.out',
         },
-        '-=0.3'
+        '-=0.2'
       );
   };
 
@@ -154,17 +181,17 @@ function LecturerInvitationContent({
           </div>
 
           {/* Realistic 3D Interactive Velvet Envelope Container */}
-          <div className="relative w-80 sm:w-96 h-56 sm:h-64 rounded-2xl bg-gradient-to-br from-[#400c14] to-[#1c0408] border-2 border-memoria-gold/60 shadow-[0_20px_50px_rgba(0,0,0,0.8)] perspective-[1000px] flex items-center justify-center overflow-visible">
-            {/* Inside Paper Letter (partially hidden inside pocket) */}
+          <div className="relative w-80 sm:w-96 h-56 sm:h-64 rounded-2xl bg-gradient-to-br from-[#400c14] to-[#1c0408] border-2 border-memoria-gold/60 shadow-[0_20px_50px_rgba(0,0,0,0.8)] perspective-[1000px] flex items-center justify-center overflow-visible mt-10 sm:mt-16">
+            {/* Inside Paper Letter (partially hidden inside pocket, slides out IN FRONT of opened flap) */}
             <div
               ref={letterRef}
-              className="absolute w-[88%] h-44 sm:h-52 rounded-xl bg-[#fff9f0] border border-memoria-gold/40 shadow-inner flex flex-col items-center justify-center text-center p-4 z-10"
+              className="absolute w-[88%] h-44 sm:h-52 rounded-xl bg-[#fff9f0] border border-memoria-gold/40 shadow-inner flex flex-col items-center justify-center text-center p-4 z-[15] will-change-transform"
             >
               <div className="text-[10px] font-mono tracking-widest text-[#891523] uppercase font-bold">
                 DIESNATALIS SIKC 2026
               </div>
               <div className="font-serif text-[#350a10] font-bold text-sm sm:text-base mt-1">
-                MEMORIA — Velvet Night
+                MEMORIA —
               </div>
               <div className="w-12 h-[1px] bg-memoria-gold my-2" />
               <div className="text-[10px] text-[#553338] italic">
@@ -174,7 +201,7 @@ function LecturerInvitationContent({
 
             {/* Envelope Pocket Body (Front side) */}
             <div
-              className="absolute inset-0 rounded-2xl z-20 pointer-events-none"
+              className="absolute inset-0 rounded-2xl z-[20] pointer-events-none"
               style={{
                 clipPath: 'polygon(0% 0%, 50% 50%, 100% 0%, 100% 100%, 0% 100%)',
                 background:
@@ -183,10 +210,10 @@ function LecturerInvitationContent({
               }}
             />
 
-            {/* Flap Triangle (Opens upwards) */}
+            {/* Flap Triangle (Opens upwards, drops to z-5 behind letter when flipped) */}
             <div
               ref={flapRef}
-              className="absolute inset-x-0 top-0 h-1/2 z-30 pointer-events-none"
+              className="absolute inset-x-0 top-0 h-1/2 z-[30] pointer-events-none will-change-transform"
               style={{
                 clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)',
                 background: 'linear-gradient(180deg, #891523 0%, #540c14 100%)',

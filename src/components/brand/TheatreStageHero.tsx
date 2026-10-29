@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { EventContent } from '@/types';
-import { BrandLogotype } from './BrandLogotype';
+import { TheatreArchFrame } from './TheatreArchFrame';
+import { TheatreCurtains } from './TheatreCurtains';
+import { StagePlatform } from './StagePlatform';
+import { TheatreCountdown } from './TheatreCountdown';
 import { calculateCountdown, formatWibDateOnly, formatWibTimeOnly, CountdownTime } from '@/lib/date';
-import { CalendarBlank, MapPin, Sparkle, Ticket } from '@phosphor-icons/react';
+import { Clock, MapPin, Ticket, ArrowClockwise, FastForward } from '@phosphor-icons/react';
 
 interface TheatreStageHeroProps {
   event: EventContent;
@@ -17,9 +20,15 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftCurtainRef = useRef<HTMLDivElement>(null);
   const rightCurtainRef = useRef<HTMLDivElement>(null);
-  const heroContentRef = useRef<HTMLDivElement>(null);
   const spotlightRef = useRef<HTMLDivElement>(null);
-  const marqueeRef = useRef<HTMLDivElement>(null);
+  const memoriaTitleRef = useRef<HTMLDivElement>(null);
+  const eventInfoRef = useRef<HTMLDivElement>(null);
+  const countdownSectionRef = useRef<HTMLDivElement>(null);
+  const ctaSectionRef = useRef<HTMLDivElement>(null);
+
+  const [isIntroRunning, setIsIntroRunning] = useState(false);
+  const [curtainsOpened, setCurtainsOpened] = useState(false);
+  const timelineRef = useRef<gsap.core.Timeline | null>(null);
 
   const [countdown, setCountdown] = useState<CountdownTime>({
     days: 0,
@@ -29,242 +38,390 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
     isPast: false,
   });
 
-  const [curtainsOpened, setCurtainsOpened] = useState(false);
-
-  // Live countdown timer tick
+  // Sinkronisasi realtime countdown timer dengan throttling ramah baterai & tab switching
   useEffect(() => {
-    setCountdown(calculateCountdown(event.eventStartAt));
-    const interval = setInterval(() => {
+    let interval: NodeJS.Timeout | null = null;
+
+    const tick = () => {
       setCountdown(calculateCountdown(event.eventStartAt));
-    }, 1000);
-    return () => clearInterval(interval);
+    };
+
+    const startTimer = () => {
+      tick();
+      if (!interval) {
+        interval = setInterval(tick, 1000);
+      }
+    };
+
+    const stopTimer = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    startTimer();
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopTimer();
+      } else {
+        startTimer();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      stopTimer();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [event.eventStartAt]);
 
-  // GSAP Curtain Opening Animation
+  // Fungsi untuk menjalankan animasi panggung GSAP
+  const playIntroAnimation = useCallback((forceReplay = false) => {
+    const isSkipParam = typeof window !== 'undefined' && window.location.search.includes('skipIntro=1');
+
+    // Jika skip param eksplisit diminta (dan bukan force replay)
+    if (isSkipParam && !forceReplay) {
+      if (leftCurtainRef.current) gsap.set(leftCurtainRef.current, { xPercent: -100 });
+      if (rightCurtainRef.current) gsap.set(rightCurtainRef.current, { xPercent: 100 });
+      if (spotlightRef.current) gsap.set(spotlightRef.current, { opacity: 0.9, scaleY: 1 });
+      if (memoriaTitleRef.current) gsap.set(memoriaTitleRef.current, { opacity: 1, y: 0, scale: 1 });
+      if (eventInfoRef.current) gsap.set(eventInfoRef.current, { opacity: 1, y: 0 });
+      if (countdownSectionRef.current) gsap.set(countdownSectionRef.current, { opacity: 1 });
+      if (ctaSectionRef.current) gsap.set(ctaSectionRef.current, { opacity: 1, y: 0 });
+      gsap.set('.stage-marquee-bulb', { opacity: 1, scale: 1 });
+      gsap.set('.marquee-countdown-box', { opacity: 1, y: 0, scale: 1 });
+      setCurtainsOpened(true);
+      setIsIntroRunning(false);
+      return;
+    }
+
+    // Kill existing timeline jika ada
+    if (timelineRef.current) {
+      timelineRef.current.kill();
+    }
+
+    setIsIntroRunning(true);
+    setCurtainsOpened(false);
+
+    // Initial Scene 01 Setup: Tirai BENAR-BENAR MENUTUP DI TENGAH (0%)
+    if (leftCurtainRef.current) gsap.set(leftCurtainRef.current, { xPercent: 0, opacity: 1 });
+    if (rightCurtainRef.current) gsap.set(rightCurtainRef.current, { xPercent: 0, opacity: 1 });
+    if (spotlightRef.current) gsap.set(spotlightRef.current, { opacity: 0, scaleY: 0.6 });
+    if (memoriaTitleRef.current) gsap.set(memoriaTitleRef.current, { opacity: 0, y: 35, scale: 0.92 });
+    if (eventInfoRef.current) gsap.set(eventInfoRef.current, { opacity: 0, y: 25 });
+    if (countdownSectionRef.current) gsap.set(countdownSectionRef.current, { opacity: 0 });
+    gsap.set('.marquee-countdown-box', { opacity: 0, y: 30, scale: 0.95 });
+    if (ctaSectionRef.current) gsap.set(ctaSectionRef.current, { opacity: 0, y: 20 });
+    gsap.set('.stage-marquee-bulb', { opacity: 0.25, scale: 0.85 });
+
+    const tl = gsap.timeline({
+      defaults: { ease: 'power3.inOut' },
+      onComplete: () => {
+        setCurtainsOpened(true);
+        setIsIntroRunning(false);
+      },
+    });
+
+    timelineRef.current = tl;
+
+    // SCENE 02: Marquee lights warm up and illuminate sequentially
+    tl.to(
+      '.stage-marquee-bulb',
+      {
+        opacity: 1,
+        scale: 1,
+        stagger: {
+          from: 'center',
+          each: 0.02,
+        },
+        duration: 0.8,
+        ease: 'power2.out',
+      },
+      '+=0.1'
+    )
+      // SCENE 03: Velvet curtains smoothly open to sides from the center
+      .to(
+        leftCurtainRef.current,
+        {
+          xPercent: -100,
+          duration: 2.4,
+          ease: 'power3.inOut',
+        },
+        '+=0.05'
+      )
+      .to(
+        rightCurtainRef.current,
+        {
+          xPercent: 100,
+          duration: 2.4,
+          ease: 'power3.inOut',
+        },
+        '<'
+      )
+      // Spotlight illuminates stage smoothly
+      .to(
+        spotlightRef.current,
+        {
+          opacity: 0.95,
+          scaleY: 1,
+          duration: 1.8,
+          ease: 'power2.out',
+        },
+        '-=1.8'
+      )
+      // SCENE 04: Main Brand Title MEMORIA reveal with graceful rise
+      .to(
+        memoriaTitleRef.current,
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 1.2,
+          ease: 'power3.out',
+        },
+        '-=1.2'
+      )
+      // SCENE 05: Event Info (Waktu & Tempat) reveal
+      .to(
+        eventInfoRef.current,
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          ease: 'power2.out',
+        },
+        '-=0.7'
+      )
+      // SCENE 06: Marquee Countdown Boxes staggered entrance
+      .to(
+        countdownSectionRef.current,
+        {
+          opacity: 1,
+          duration: 0.3,
+        },
+        '-=0.5'
+      )
+      .to(
+        '.marquee-countdown-box',
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          stagger: 0.08,
+          duration: 0.7,
+          ease: 'power3.out',
+        },
+        '-=0.4'
+      )
+      // SCENE 07: CTA Action buttons appear
+      .to(
+        ctaSectionRef.current,
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.6,
+          ease: 'power2.out',
+        },
+        '-=0.3'
+      );
+  }, []);
+
+  // Jalankan animasi GSAP pada mount
   useGSAP(
     () => {
-      // Check reduced motion
-      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      if (prefersReduced) {
-        if (leftCurtainRef.current) leftCurtainRef.current.style.transform = 'translateX(-100%)';
-        if (rightCurtainRef.current) rightCurtainRef.current.style.transform = 'translateX(100%)';
-        if (heroContentRef.current) heroContentRef.current.style.opacity = '1';
-        if (spotlightRef.current) spotlightRef.current.style.opacity = '0.8';
-        setCurtainsOpened(true);
-        return;
-      }
-
-      const tl = gsap.timeline({
-        defaults: { ease: 'power3.inOut' },
-        onComplete: () => setCurtainsOpened(true),
-      });
-
-      // Step 1: Marquee bulbs warm up and flicker
-      tl.fromTo(
-        '.marquee-bulb',
-        { opacity: 0.2, scale: 0.8 },
-        { opacity: 1, scale: 1, stagger: 0.04, duration: 0.8, ease: 'power2.out' }
-      )
-        // Step 2: Velvet curtains smoothly open to the sides
-        .to(
-          leftCurtainRef.current,
-          {
-            xPercent: -100,
-            duration: 2.2,
-            ease: 'power3.inOut',
-          },
-          '+=0.2'
-        )
-        .to(
-          rightCurtainRef.current,
-          {
-            xPercent: 100,
-            duration: 2.2,
-            ease: 'power3.inOut',
-          },
-          '<'
-        )
-        // Step 3: Spotlight shines down on the stage
-        .to(
-          spotlightRef.current,
-          {
-            opacity: 0.85,
-            scaleY: 1,
-            duration: 1.4,
-            ease: 'power2.out',
-          },
-          '-=1.4'
-        )
-        // Step 4: Hero Content reveals inside the theatre
-        .fromTo(
-          heroContentRef.current,
-          { opacity: 0, y: 35, scale: 0.96 },
-          { opacity: 1, y: 0, scale: 1, duration: 1.2, ease: 'power2.out' },
-          '-=0.8'
-        );
+      playIntroAnimation(false);
     },
     { scope: containerRef }
   );
 
+  // Skip Intro Handler
+  const handleSkipIntro = () => {
+    if (timelineRef.current) {
+      timelineRef.current.progress(1);
+    }
+  };
+
+  // Replay Intro Handler
+  const handleReplayIntro = () => {
+    playIntroAnimation(true);
+  };
+
   return (
-    <div
+    <section
       ref={containerRef}
-      className="relative w-full min-h-[90vh] md:min-h-[95vh] flex items-center justify-center overflow-hidden bg-memoria-midnight border-b border-memoria-gold/30 select-none"
+      aria-label="Section 1: Panggung Teater Memoria"
+      className="relative w-full bg-white py-3 sm:py-8 md:py-12 px-2 sm:px-6 lg:px-8 overflow-hidden select-none"
     >
-      {/* 1. Backdrop Ambient Texture & Radial Glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-memoria-dark-wine via-memoria-midnight to-[#0d0405] z-0" />
+      {/* ========================================================= */}
+      {/* LAYER 1: GRAND THEATRICAL PROSCENIUM STAGE CONTAINER */}
+      {/* Panggung teater berdiri proporsional (tidak gepeng) di tengah kanvas */}
+      {/* ========================================================= */}
+      <div className="relative w-full max-w-6xl xl:max-w-7xl mx-auto rounded-[24px] sm:rounded-[50px] shadow-[0_25px_70px_rgba(20,8,9,0.25),0_10px_25px_rgba(0,0,0,0.15)] overflow-hidden bg-[#140809] border border-[#d6b46a]/40 min-h-[560px] xs:min-h-[600px] sm:min-h-[700px] md:min-h-[820px] lg:min-h-[880px] flex items-center justify-center">
 
-      {/* 2. Overhead Spotlight Beam (Radial cone from top) */}
-      <div
-        ref={spotlightRef}
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[80vw] max-w-4xl h-full opacity-0 pointer-events-none z-10"
-        style={{
-          background:
-            'conic-gradient(from 180deg at 50% 0%, transparent 40%, rgba(214,180,106,0.18) 48%, rgba(245,233,211,0.28) 50%, rgba(214,180,106,0.18) 52%, transparent 60%)',
-        }}
-      />
+        {/* 1. Backdrop Ambient Texture & Dark Velvet Gradient */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#350a10] via-[#1a0508] to-[#0c0204] z-0" />
 
-      {/* 3. Proscenium Arch & Perimeter Marquee Lights */}
-      <div
-        ref={marqueeRef}
-        className="absolute inset-x-2 sm:inset-x-8 top-2 bottom-0 pointer-events-none z-30 rounded-t-[40px] sm:rounded-t-[80px] border-t-4 border-x-4 border-memoria-gold/60 shadow-[inset_0_0_50px_rgba(137,21,35,0.4)]"
-      >
-        {/* Top Marquee Bulbs Row */}
-        <div className="absolute top-1 inset-x-4 flex justify-around items-center px-4">
-          {[...Array(18)].map((_, i) => (
-            <div
-              key={`bulb-${i}`}
-              className="marquee-bulb w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-memoria-champagne border border-memoria-gold shadow-[0_0_12px_rgba(214,180,106,0.9)] animate-marquee-glow"
-              style={{ animationDelay: `${(i % 5) * 0.4}s` }}
-            />
-          ))}
-        </div>
-      </div>
+        {/* 2. Velvet Curtains (Backdrop + Left & Right Animatable Folds) */}
+        <TheatreCurtains leftCurtainRef={leftCurtainRef} rightCurtainRef={rightCurtainRef} />
 
-      {/* 4. Multi-tier Stage Podium at bottom */}
-      <div className="absolute bottom-0 inset-x-0 h-28 sm:h-36 pointer-events-none z-20 flex flex-col items-center justify-end">
-        {/* Upper step */}
-        <div className="w-[85vw] max-w-5xl h-8 bg-gradient-to-r from-memoria-dark-wine via-memoria-burgundy to-memoria-dark-wine border-t-2 border-memoria-gold/70 rounded-t-xl shadow-[0_-10px_30px_rgba(0,0,0,0.8)]" />
-        {/* Lower step */}
-        <div className="w-[95vw] max-w-6xl h-12 bg-gradient-to-r from-[#200508] via-memoria-dark-wine to-[#200508] border-t border-memoria-gold/40 shadow-2xl flex items-center justify-center">
-          <div className="w-full h-1 bg-gradient-to-r from-transparent via-memoria-gold/40 to-transparent" />
-        </div>
-      </div>
+        {/* 3. Golden Theatre Proscenium Arch & Marquee Bulbs Perimeter */}
+        <TheatreArchFrame />
 
-      {/* 5. DUAL VELVET CURTAINS (Left & Right) */}
-      {/* Left Curtain */}
-      <div
-        ref={leftCurtainRef}
-        className="absolute inset-y-0 left-0 w-1/2 z-40 origin-left flex shadow-2xl"
-        style={{
-          background:
-            'repeating-linear-gradient(90deg, #660e18 0px, #891523 25px, #b52735 45px, #660e18 70px)',
-          boxShadow: 'inset -20px 0 50px rgba(0,0,0,0.8), 10px 0 30px rgba(0,0,0,0.9)',
-        }}
-      >
-        {/* Golden curtain trim tassels */}
-        <div className="absolute right-0 inset-y-0 w-3 bg-gradient-to-b from-memoria-gold via-memoria-champagne to-memoria-copper shadow-md opacity-80" />
-      </div>
+        {/* 4. Overhead Stage Spotlight Beam */}
+        <div
+          ref={spotlightRef}
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[90vw] max-w-4xl h-full opacity-0 pointer-events-none z-15"
+          style={{
+            background:
+              'conic-gradient(from 180deg at 50% 0%, transparent 40%, rgba(214,180,106,0.2) 48%, rgba(245,233,211,0.35) 50%, rgba(214,180,106,0.2) 52%, transparent 60%)',
+          }}
+        />
 
-      {/* Right Curtain */}
-      <div
-        ref={rightCurtainRef}
-        className="absolute inset-y-0 right-0 w-1/2 z-40 origin-right flex shadow-2xl"
-        style={{
-          background:
-            'repeating-linear-gradient(90deg, #660e18 0px, #891523 25px, #b52735 45px, #660e18 70px)',
-          boxShadow: 'inset 20px 0 50px rgba(0,0,0,0.8), -10px 0 30px rgba(0,0,0,0.9)',
-        }}
-      >
-        {/* Golden curtain trim tassels */}
-        <div className="absolute left-0 inset-y-0 w-3 bg-gradient-to-b from-memoria-gold via-memoria-champagne to-memoria-copper shadow-md opacity-80" />
-      </div>
+        {/* ========================================================= */}
+        {/* LAYER 6, 7, 8: CENTERSTAGE HERO CONTENT */}
+        {/* ========================================================= */}
+        <div className="relative z-10 w-full min-w-0 max-w-4xl mx-auto px-2 sm:px-8 text-center flex flex-col items-center gap-2.5 xs:gap-3 sm:gap-6 pt-14 xs:pt-16 sm:pt-24 md:pt-28 lg:pt-32 pb-14 sm:pb-28 md:pb-32">
 
-      {/* 6. HERO CONTENT CENTERSTAGE (Revealed when curtains open) */}
-      <div
-        ref={heroContentRef}
-        className="relative z-25 max-w-4xl mx-auto px-4 sm:px-6 text-center flex flex-col items-center gap-6 py-16"
-      >
-        {/* Tagline Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-memoria-dark-wine/80 border border-memoria-gold/50 text-memoria-champagne text-xs sm:text-sm tracking-[0.25em] uppercase shadow-lg">
-          <Sparkle size={15} weight="fill" className="text-memoria-gold" />
-          <span>{event.tagline}</span>
-        </div>
+          {/* MAIN SIGN: MEMORIA (Font Ballet, Ekstra Besar & Megah dengan Jarak Aman dari Busur Lengkung) */}
+          <div ref={memoriaTitleRef} className="flex flex-col items-center select-none pt-1 sm:pt-4 px-2 overflow-visible opacity-0">
+            <h1
+              style={{
+                fontFamily: 'var(--font-ballet), cursive',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                display: 'inline-block',
+              }}
+              className="text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-[7.8rem] font-normal tracking-[0.06em] bg-gradient-to-b from-[#fffbf0] via-[#f5d890] to-[#cba358] drop-shadow-[0_4px_24px_rgba(214,180,106,0.65)] hover:scale-102 transition-transform duration-300 leading-[1.35] pt-2 sm:pt-4 pb-2 px-3 overflow-visible"
+            >
+              Memoria
+            </h1>
 
-        {/* Signature Brand Wordmark */}
-        <BrandLogotype size="hero" showSubtitle={false} />
-
-        {/* Description */}
-        <p className="max-w-2xl text-sm sm:text-base text-memoria-ivory/90 leading-relaxed font-normal px-2">
-          {event.description}
-        </p>
-
-        {/* Event Schedule & Venue Card */}
-        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 py-3 px-6 rounded-2xl bg-memoria-dark-wine/60 border border-memoria-gold/30 text-xs sm:text-sm text-memoria-champagne shadow-xl backdrop-blur-sm">
-          <div className="flex items-center gap-2">
-            <CalendarBlank size={18} weight="bold" className="text-memoria-gold shrink-0" />
-            <span>
-              {formatWibDateOnly(event.eventStartAt)} • {formatWibTimeOnly(event.eventStartAt)}
-            </span>
-          </div>
-          <span className="hidden sm:inline text-memoria-gold/40">|</span>
-          <div className="flex items-center gap-2">
-            <MapPin size={18} weight="bold" className="text-memoria-gold shrink-0" />
-            <span>{event.venueName}</span>
-          </div>
-        </div>
-
-        {/* LIVE COUNTDOWN TIMER */}
-        <div className="flex flex-col items-center gap-2 mt-2">
-          <div className="text-[11px] tracking-[0.2em] uppercase text-memoria-gold/80 font-semibold">
-            {countdown.isPast ? 'Acara Telah Dimulai' : 'Menuju Malam Puncak'}
-          </div>
-          {!countdown.isPast ? (
-            <div className="flex items-center gap-2.5 sm:gap-4 font-mono">
-              {[
-                { label: 'HARI', val: countdown.days },
-                { label: 'JAM', val: countdown.hours },
-                { label: 'MENIT', val: countdown.minutes },
-                { label: 'DETIK', val: countdown.seconds },
-              ].map((item, idx) => (
-                <React.Fragment key={item.label}>
-                  <div className="flex flex-col items-center justify-center w-14 sm:w-20 h-16 sm:h-20 rounded-xl bg-gradient-to-b from-[#24080b] to-[#140406] border border-memoria-gold/40 shadow-inner">
-                    <span className="text-xl sm:text-3xl font-bold text-memoria-ivory tabular-nums">
-                      {String(item.val).padStart(2, '0')}
-                    </span>
-                    <span className="text-[9px] sm:text-[10px] tracking-wider text-memoria-champagne/70 font-sans mt-0.5">
-                      {item.label}
-                    </span>
-                  </div>
-                  {idx < 3 && <span className="text-xl sm:text-2xl font-bold text-memoria-gold/60">:</span>}
-                </React.Fragment>
-              ))}
+            {/* Signature Metallic Underline with Art Deco Diamond Accent */}
+            <div className="w-24 xs:w-32 sm:w-64 md:w-80 my-0.5 sm:my-2 relative flex items-center justify-center">
+              <div className="w-full h-[1.5px] bg-gradient-to-r from-transparent via-[#f5d890] to-transparent opacity-85" />
+              <div className="absolute w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 rotate-45 bg-[#fef08a] border border-[#a16207] shadow-[0_0_8px_rgba(250,204,21,0.9)]" />
             </div>
-          ) : (
-            <div className="py-2 px-6 rounded-full bg-memoria-burgundy/80 text-memoria-ivory font-bold text-sm tracking-wider border border-memoria-gold/40">
-              Pertunjukan Teater Sedang Berlangsung
+          </div>
+
+          {/* EVENT INFORMATION: WAKTU & TEMPAT (Tetap Samping-Sampingan / Grid-2 di Semua Ukuran Layar) */}
+          <div
+            ref={eventInfoRef}
+            className="w-full max-w-[280px] xs:max-w-[310px] sm:max-w-2xl px-2 sm:px-6 py-1.5 sm:py-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-[#2c090d]/85 via-[#3a0d13]/90 to-[#2c090d]/85 border border-[#d6b46a]/40 shadow-xl backdrop-blur-md opacity-0"
+          >
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-4 items-center divide-x divide-[#d6b46a]/30">
+              
+              {/* SISI KIRI: WAKTU */}
+              <div className="flex items-center justify-center gap-1.5 sm:gap-3 pr-1 sm:pr-4">
+                <div className="w-4 h-4 xs:w-5 xs:h-5 sm:w-9 sm:h-9 rounded-full bg-[#1c0406] border border-[#d6b46a]/50 flex items-center justify-center shrink-0 shadow-inner">
+                  <Clock size={10} weight="fill" className="text-[#f5d890] sm:hidden" />
+                  <Clock size={18} weight="fill" className="text-[#f5d890] hidden sm:block" />
+                </div>
+                <div className="text-left min-w-0">
+                  <span
+                    style={{ fontFamily: 'var(--font-bodoni), Georgia, serif' }}
+                    className="block text-[7px] sm:text-[10px] tracking-[0.16em] sm:tracking-[0.25em] uppercase text-[#d6b46a] font-semibold"
+                  >
+                    WAKTU
+                  </span>
+                  <span className="block text-[7.5px] xs:text-[8.5px] sm:text-sm font-medium text-[#f5e9d3] leading-tight truncate">
+                    {formatWibDateOnly(event.eventStartAt)}
+                  </span>
+                  <span className="block text-[7px] sm:text-[11px] font-mono text-[#f5d890]/80 leading-tight">
+                    Pukul {formatWibTimeOnly(event.eventStartAt)}
+                  </span>
+                </div>
+              </div>
+
+              {/* SISI KANAN: TEMPAT */}
+              <div className="flex items-center justify-center gap-1.5 sm:gap-3 pl-1 sm:pl-4">
+                <div className="w-4 h-4 xs:w-5 xs:h-5 sm:w-9 sm:h-9 rounded-full bg-[#1c0406] border border-[#d6b46a]/50 flex items-center justify-center shrink-0 shadow-inner">
+                  <MapPin size={10} weight="fill" className="text-[#f5d890] sm:hidden" />
+                  <MapPin size={18} weight="fill" className="text-[#f5d890] hidden sm:block" />
+                </div>
+                <div className="text-left min-w-0">
+                  <span
+                    style={{ fontFamily: 'var(--font-bodoni), Georgia, serif' }}
+                    className="block text-[7px] sm:text-[10px] tracking-[0.16em] sm:tracking-[0.25em] uppercase text-[#d6b46a] font-semibold"
+                  >
+                    TEMPAT
+                  </span>
+                  <span className="block text-[7.5px] xs:text-[8.5px] sm:text-sm font-medium text-[#f5e9d3] leading-tight truncate max-w-[90px] xs:max-w-[110px] sm:max-w-[220px]">
+                    {event.venueName}
+                  </span>
+                  <span className="block text-[7px] sm:text-[11px] text-[#f5d890]/80 font-sans leading-tight truncate max-w-[90px] xs:max-w-[110px] sm:max-w-[220px]">
+                    Telkom University
+                  </span>
+                </div>
+              </div>
+
             </div>
+          </div>
+
+          {/* MARQUEE COUNTDOWN TIMER (4 Kotak Lampu Kuning Broadway Proporsional) */}
+          <div ref={countdownSectionRef} className="flex flex-col items-center gap-1 sm:gap-2 mt-0.5 sm:mt-1 w-full max-w-3xl opacity-0">
+            <div className="text-[7.5px] xs:text-[8.5px] sm:text-xs tracking-[0.18em] sm:tracking-[0.25em] uppercase text-[#d6b46a]/90 font-semibold">
+              {countdown.isPast ? 'Acara Telah Dimulai' : 'Menuju Malam Puncak'}
+            </div>
+            <TheatreCountdown countdown={countdown} />
+          </div>
+
+          {/* ACTION CALL-TO-ACTIONS (Tetap Samping-Sampingan / Row yang Compact dan Elegan) */}
+          <div ref={ctaSectionRef} className="flex flex-row items-center justify-center gap-2 sm:gap-4 pt-1 sm:pt-2 w-full max-w-[280px] xs:max-w-[320px] sm:max-w-none opacity-0">
+            <Link
+              href="/daftar"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1 sm:gap-2 px-2 xs:px-3 sm:px-8 py-1.5 sm:py-3.5 rounded-full bg-gradient-to-r from-[#891523] via-[#b52735] to-[#891523] text-[#fffdfa] font-bold text-[8.5px] xs:text-[9.5px] sm:text-sm tracking-normal sm:tracking-wider shadow-[0_4px_16px_rgba(181,39,53,0.55)] border border-[#f5d890]/80 hover:border-[#fef08a] hover:scale-105 active:scale-95 transition-all duration-300 whitespace-nowrap"
+            >
+              <Ticket size={11} weight="fill" className="text-[#f5d890] shrink-0 sm:hidden" />
+              <Ticket size={18} weight="fill" className="text-[#f5d890] shrink-0 hidden sm:block" />
+              <span>PILIH TIKET GRATIS</span>
+            </Link>
+            <a
+              href="#lineup-band"
+              className="flex-1 sm:flex-initial flex items-center justify-center px-2 xs:px-3 sm:px-6 py-1.5 sm:py-3.5 rounded-full bg-[#350a10]/80 text-[#f5e9d3] font-medium text-[8.5px] xs:text-[9.5px] sm:text-sm tracking-normal sm:tracking-wider border border-[#d6b46a]/40 hover:bg-[#520d16] hover:border-[#d6b46a] transition-all whitespace-nowrap"
+            >
+              Lihat Lineup Band
+            </a>
+          </div>
+
+        </div>
+
+        {/* 5. Stage Platform Podium (Lantai Panggung Bertingkat di Bagian Bawah) */}
+        <StagePlatform />
+
+        {/* ========================================================= */}
+        {/* INTERACTIVE FLOATING CONTROLS: REPLAY INTRO & SKIP INTRO */}
+        {/* ========================================================= */}
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-40 flex items-center gap-2">
+          {/* Skip Intro Button (Tampil hanya saat animasi berjalan) */}
+          {isIntroRunning && (
+            <button
+              onClick={handleSkipIntro}
+              type="button"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 border border-[#d6b46a]/40 text-[#f5d890] text-xs font-mono tracking-wider hover:bg-[#891523] transition-colors shadow-lg backdrop-blur-md"
+              title="Lewati Animasi Tirai"
+            >
+              <FastForward size={14} weight="fill" />
+              <span>SKIP</span>
+            </button>
+          )}
+
+          {/* Replay Intro Button (Tampil saat tirai sudah terbuka) */}
+          {curtainsOpened && (
+            <button
+              onClick={handleReplayIntro}
+              type="button"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#200407]/80 border border-[#d6b46a]/50 text-[#f5d890] text-xs font-mono tracking-wider hover:bg-[#891523] hover:text-white transition-all shadow-lg backdrop-blur-md group"
+              title="Putar Ulang Animasi Tirai Panggung"
+            >
+              <ArrowClockwise size={14} className="group-hover:rotate-180 transition-transform duration-500" />
+              <span className="hidden sm:inline">REPLAY INTRO</span>
+            </button>
           )}
         </div>
 
-        {/* Action CTAs */}
-        <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-          <Link
-            href="/daftar"
-            className="flex items-center gap-2 px-8 py-3.5 rounded-full bg-gradient-to-r from-memoria-burgundy to-memoria-stage-red text-memoria-ivory font-bold text-sm tracking-wider shadow-[0_6px_25px_rgba(137,21,35,0.7)] border border-memoria-gold/70 hover:scale-105 active:scale-95 transition-all duration-300"
-          >
-            <Ticket size={20} weight="fill" className="text-memoria-champagne" />
-            <span>PILIH TIKET GRATIS</span>
-          </Link>
-          <a
-            href="#lineup-band"
-            className="px-6 py-3.5 rounded-full bg-memoria-dark-wine/80 text-memoria-champagne font-medium text-sm tracking-wider border border-memoria-gold/30 hover:bg-memoria-dark-wine hover:border-memoria-gold transition-colors"
-          >
-            Lihat Lineup Band
-          </a>
-        </div>
       </div>
-    </div>
+    </section>
   );
 }

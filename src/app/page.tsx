@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { PublicLayoutShell } from '@/components/public/PublicLayoutShell';
 import { TheatreStageHero } from '@/components/brand/TheatreStageHero';
 import { BandShowcase } from '@/components/public/BandShowcase';
-import { TeasersSection } from '@/components/public/TeasersSection';
+import { FashionShowcase } from '@/components/public/FashionShowcase';
+import { AwardingShowcase } from '@/components/public/AwardingShowcase';
 import { eventAdapter } from '@/data/adapters';
 import { mockStore } from '@/data/mock/mockStore';
 import { EventContent, Band } from '@/types';
@@ -28,15 +29,21 @@ export default function HomePage() {
   }, []);
 
   return (
-    <PublicLayoutShell>
+    <PublicLayoutShell className="bg-white text-neutral-900">
       {/* 1. Theatre Proscenium Stage Hero with GSAP Curtains, Marquee, Countdown & Identity */}
       <TheatreStageHero event={event} />
 
-      {/* 2. Band Showcase in Asymmetric Alternating Layout */}
-      <BandShowcase bands={bands} />
+      {/* Latar Belakang Putih Bersih untuk Section Konten */}
+      <div className="bg-white text-neutral-900 transition-colors">
+        {/* 2. Band Showcase in Asymmetric Alternating Layout */}
+        <BandShowcase bands={bands} />
 
-      {/* 3. Fashion Show & Awarding Editorial Teasers */}
-      <TeasersSection event={event} />
+        {/* 3. The Velvet Runway Fashion Show Stage */}
+        <FashionShowcase event={event} />
+
+        {/* 4. The Golden Spotlight Ceremony Awarding Stage (Redesigned Theatrical Stage) */}
+        <AwardingShowcase event={event} />
+      </div>
     </PublicLayoutShell>
   );
 }

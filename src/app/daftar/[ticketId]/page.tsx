@@ -256,7 +256,7 @@ function TicketRegistrationContent({
                   ) : (
                     <>
                       <Ticket size={20} weight="fill" className="text-memoria-gold" />
-                      <span>Daftar Tiket Gratis</span>
+                      <span>Daftar Tiket</span>
                     </>
                   )}
                 </button>

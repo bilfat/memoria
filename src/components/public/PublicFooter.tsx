@@ -32,7 +32,7 @@ export function PublicFooter() {
             </Link>
             <span className="text-memoria-gold/40">•</span>
             <Link href="/daftar" className="hover:text-memoria-gold transition-colors">
-              Tiket Gratis
+              Tiket
             </Link>
             <span className="text-memoria-gold/40">•</span>
             <Link href="/panitia/login" className="hover:text-memoria-gold transition-colors flex items-center gap-1">

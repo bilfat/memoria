@@ -37,14 +37,12 @@
   --z-curtain: 110;
 }
 
-/* Custom marquee light animation */
+/* Custom marquee light animation - GPU composited opacity (no expensive raster filter) */
 @keyframes marqueeGlow {
   0%, 100% {
-    filter: drop-shadow(0 0 4px rgba(214, 180, 106, 0.4));
-    opacity: 0.85;
+    opacity: 0.65;
   }
   50% {
-    filter: drop-shadow(0 0 10px rgba(214, 180, 106, 0.95));
     opacity: 1;
   }
 }

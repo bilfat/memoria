@@ -38,7 +38,7 @@ export function FloatingTicketCTA() {
           <span className="relative inline-flex rounded-full h-3 w-3 bg-memoria-gold"></span>
         </span>
         <Ticket size={22} weight="fill" className="text-memoria-champagne group-hover:rotate-12 transition-transform duration-300" />
-        <span className="tracking-wide">Tiket Gratis</span>
+        <span className="tracking-wide">Tiket</span>
         <span className="hidden sm:inline text-xs text-memoria-champagne/80 font-normal">
           Daftar Sekarang
         </span>
