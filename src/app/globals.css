@@ -1,0 +1,53 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+@theme inline {
+  --color-memoria-burgundy: var(--memoria-burgundy);
+  --color-memoria-gold: var(--memoria-antique-gold);
+  --color-memoria-midnight: var(--memoria-midnight);
+  --color-memoria-dark-wine: var(--memoria-dark-wine);
+  --color-memoria-stage-red: var(--memoria-stage-red);
+  --color-memoria-ivory: var(--memoria-ivory);
+  --color-memoria-champagne: var(--memoria-champagne);
+  --color-memoria-copper: var(--memoria-copper);
+  --color-memoria-dusty-rose: var(--memoria-dusty-rose);
+  --color-memoria-soft-white: var(--memoria-soft-white);
+  --color-memoria-deep-plum: var(--memoria-deep-plum);
+
+  --color-admin-canvas: var(--admin-canvas);
+  --color-admin-surface: var(--admin-surface);
+  --color-admin-text: var(--admin-text);
+  --color-admin-muted: var(--admin-muted);
+  --color-admin-border: var(--admin-border);
+  --color-admin-accent: var(--admin-accent);
+  --color-admin-accent-tint: var(--admin-accent-tint);
+
+  --color-status-success: var(--status-success);
+  --color-status-warning: var(--status-warning);
+  --color-status-error: var(--status-error);
+  --color-status-info: var(--status-info);
+
+  --font-brand: var(--font-ballet), cursive;
+  --font-heading: var(--font-bodoni), Georgia, serif;
+  --font-sans: var(--font-dm-sans), Arial, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--memoria-midnight);
+  color: var(--memoria-ivory);
+}
+
+:focus-visible {
+  outline: 2px solid var(--memoria-antique-gold);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

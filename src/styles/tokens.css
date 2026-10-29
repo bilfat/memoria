@@ -1,0 +1,109 @@
+:root {
+  /* Brand Public Palette */
+  --memoria-burgundy: #891523;
+  --memoria-antique-gold: #D6B46A;
+  --memoria-midnight: #140809;
+  --memoria-dark-wine: #350A10;
+  --memoria-stage-red: #B52735;
+  --memoria-ivory: #F5E9D3;
+  --memoria-champagne: #EACFA4;
+  --memoria-copper: #B87545;
+  --memoria-dusty-rose: #A98A8F;
+  --memoria-soft-white: #FFF9F0;
+  --memoria-deep-plum: #24131B;
+
+  /* Admin Clean Minimal Palette */
+  --admin-canvas: #F8F9FB;
+  --admin-surface: #FFFFFF;
+  --admin-text: #252932;
+  --admin-muted: #6B7280;
+  --admin-border: #E5E7EB;
+  --admin-accent: #891523;
+  --admin-accent-tint: #FAEDEF;
+  --admin-focus: #891523;
+
+  /* Semantic status colors */
+  --status-success: #2E8B67;
+  --status-warning: #C58C32;
+  --status-error: #C94E57;
+  --status-info: #497FA6;
+
+  /* Layers */
+  --z-nav: 50;
+  --z-floating: 60;
+  --z-drawer: 70;
+  --z-modal: 90;
+  --z-toast: 100;
+  --z-curtain: 110;
+}
+
+/* Custom marquee light animation */
+@keyframes marqueeGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px rgba(214, 180, 106, 0.4));
+    opacity: 0.85;
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(214, 180, 106, 0.95));
+    opacity: 1;
+  }
+}
+
+/* Candidate subtle 3D sway animation */
+@keyframes candidateSway {
+  0%, 100% {
+    transform: rotateY(-8deg) translateY(0px);
+  }
+  50% {
+    transform: rotateY(8deg) translateY(-6px);
+  }
+}
+
+/* Spotlight pulse */
+@keyframes spotlightPulse {
+  0%, 100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+/* Gold shimmer effect */
+@keyframes goldShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-marquee-glow {
+  animation: marqueeGlow 2.4s ease-in-out infinite;
+}
+
+.animate-candidate-sway {
+  animation: candidateSway 6.5s ease-in-out infinite;
+  transform-style: preserve-3d;
+}
+
+.animate-spotlight-pulse {
+  animation: spotlightPulse 4s ease-in-out infinite;
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #f5e9d3 0%, #d6b46a 50%, #b87545 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-border-frame {
+  border: 1px solid #d6b46a;
+  box-shadow: 0 0 15px rgba(214, 180, 106, 0.15);
+}
+
+.velvet-card {
+  background: linear-gradient(145deg, #350a10 0%, #200508 100%);
+  border: 1px solid rgba(214, 180, 106, 0.3);
+}
