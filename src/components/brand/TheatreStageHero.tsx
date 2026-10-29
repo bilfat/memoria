@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import Link from 'next/link';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { EventContent } from '@/types';
@@ -10,7 +9,7 @@ import { TheatreCurtains } from './TheatreCurtains';
 import { StagePlatform } from './StagePlatform';
 import { TheatreCountdown } from './TheatreCountdown';
 import { calculateCountdown, formatWibDateOnly, formatWibTimeOnly, CountdownTime } from '@/lib/date';
-import { Clock, MapPin, Ticket, ArrowClockwise, FastForward } from '@phosphor-icons/react';
+import { Clock, MapPin, ArrowClockwise, FastForward } from '@phosphor-icons/react';
 
 interface TheatreStageHeroProps {
   event: EventContent;
@@ -24,7 +23,6 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
   const memoriaTitleRef = useRef<HTMLDivElement>(null);
   const eventInfoRef = useRef<HTMLDivElement>(null);
   const countdownSectionRef = useRef<HTMLDivElement>(null);
-  const ctaSectionRef = useRef<HTMLDivElement>(null);
 
   const [isIntroRunning, setIsIntroRunning] = useState(false);
   const [curtainsOpened, setCurtainsOpened] = useState(false);
@@ -89,7 +87,6 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
       if (memoriaTitleRef.current) gsap.set(memoriaTitleRef.current, { opacity: 1, y: 0, scale: 1 });
       if (eventInfoRef.current) gsap.set(eventInfoRef.current, { opacity: 1, y: 0 });
       if (countdownSectionRef.current) gsap.set(countdownSectionRef.current, { opacity: 1 });
-      if (ctaSectionRef.current) gsap.set(ctaSectionRef.current, { opacity: 1, y: 0 });
       gsap.set('.stage-marquee-bulb', { opacity: 1, scale: 1 });
       gsap.set('.marquee-countdown-box', { opacity: 1, y: 0, scale: 1 });
       setCurtainsOpened(true);
@@ -113,7 +110,6 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
     if (eventInfoRef.current) gsap.set(eventInfoRef.current, { opacity: 0, y: 25 });
     if (countdownSectionRef.current) gsap.set(countdownSectionRef.current, { opacity: 0 });
     gsap.set('.marquee-countdown-box', { opacity: 0, y: 30, scale: 0.95 });
-    if (ctaSectionRef.current) gsap.set(ctaSectionRef.current, { opacity: 0, y: 20 });
     gsap.set('.stage-marquee-bulb', { opacity: 0.25, scale: 0.85 });
 
     const tl = gsap.timeline({
@@ -214,17 +210,6 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
           ease: 'power3.out',
         },
         '-=0.4'
-      )
-      // SCENE 07: CTA Action buttons appear
-      .to(
-        ctaSectionRef.current,
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.6,
-          ease: 'power2.out',
-        },
-        '-=0.3'
       );
   }, []);
 
@@ -252,7 +237,7 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
     <section
       ref={containerRef}
       aria-label="Section 1: Panggung Teater Memoria"
-      className="relative w-full bg-white py-3 sm:py-8 md:py-12 px-2 sm:px-6 lg:px-8 overflow-hidden select-none"
+      className="relative w-full bg-transparent py-3 sm:py-8 md:py-12 px-2 sm:px-6 lg:px-8 overflow-hidden select-none"
     >
       {/* ========================================================= */}
       {/* LAYER 1: GRAND THEATRICAL PROSCENIUM STAGE CONTAINER */}
@@ -282,10 +267,10 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
         {/* ========================================================= */}
         {/* LAYER 6, 7, 8: CENTERSTAGE HERO CONTENT */}
         {/* ========================================================= */}
-        <div className="relative z-10 w-full min-w-0 max-w-4xl mx-auto px-2 sm:px-8 text-center flex flex-col items-center gap-2.5 xs:gap-3 sm:gap-6 pt-14 xs:pt-16 sm:pt-24 md:pt-28 lg:pt-32 pb-14 sm:pb-28 md:pb-32">
+        <div className="relative z-10 w-full min-w-0 max-w-4xl mx-auto px-3 sm:px-8 text-center flex flex-col items-center gap-4 sm:gap-6 pt-12 xs:pt-14 sm:pt-22 md:pt-26 pb-12 xs:pb-14 sm:pb-22 md:pb-26">
 
-          {/* MAIN SIGN: MEMORIA (Font Ballet, Ekstra Besar & Megah dengan Jarak Aman dari Busur Lengkung) */}
-          <div ref={memoriaTitleRef} className="flex flex-col items-center select-none pt-1 sm:pt-4 px-2 overflow-visible opacity-0">
+          {/* MAIN SIGN: MEMORIA (Font Ballet, Besar & Megah dengan Keterbacaan Penuh di Semua Layar) */}
+          <div ref={memoriaTitleRef} className="flex flex-col items-center select-none pt-1 sm:pt-3 px-2 overflow-visible opacity-0">
             <h1
               style={{
                 fontFamily: 'var(--font-ballet), cursive',
@@ -293,64 +278,62 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
                 WebkitTextFillColor: 'transparent',
                 display: 'inline-block',
               }}
-              className="text-3xl xs:text-4xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-[7.8rem] font-normal tracking-[0.06em] bg-gradient-to-b from-[#fffbf0] via-[#f5d890] to-[#cba358] drop-shadow-[0_4px_24px_rgba(214,180,106,0.65)] hover:scale-102 transition-transform duration-300 leading-[1.35] pt-2 sm:pt-4 pb-2 px-3 overflow-visible"
+              className="text-5xl xs:text-6xl sm:text-7xl md:text-8xl lg:text-[7.8rem] xl:text-[8.5rem] font-normal tracking-[0.05em] bg-gradient-to-b from-[#fffbf0] via-[#f5d890] to-[#cba358] drop-shadow-[0_4px_24px_rgba(214,180,106,0.65)] hover:scale-102 transition-transform duration-300 leading-[1.3] pt-1 sm:pt-3 pb-1 px-3 overflow-visible"
             >
               Memoria
             </h1>
 
             {/* Signature Metallic Underline with Art Deco Diamond Accent */}
-            <div className="w-24 xs:w-32 sm:w-64 md:w-80 my-0.5 sm:my-2 relative flex items-center justify-center">
+            <div className="w-32 xs:w-40 sm:w-64 md:w-80 my-1 sm:my-2 relative flex items-center justify-center">
               <div className="w-full h-[1.5px] bg-gradient-to-r from-transparent via-[#f5d890] to-transparent opacity-85" />
-              <div className="absolute w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 rotate-45 bg-[#fef08a] border border-[#a16207] shadow-[0_0_8px_rgba(250,204,21,0.9)]" />
+              <div className="absolute w-2 h-2 sm:w-2.5 sm:h-2.5 rotate-45 bg-[#fef08a] border border-[#a16207] shadow-[0_0_8px_rgba(250,204,21,0.9)]" />
             </div>
           </div>
 
-          {/* EVENT INFORMATION: WAKTU & TEMPAT (Tetap Samping-Sampingan / Grid-2 di Semua Ukuran Layar) */}
+          {/* EVENT INFORMATION: WAKTU & TEMPAT (Atas-Bawah di HP agar Jelas & Mudah Dibaca, Sampingan di Desktop) */}
           <div
             ref={eventInfoRef}
-            className="w-full max-w-[280px] xs:max-w-[310px] sm:max-w-2xl px-2 sm:px-6 py-1.5 sm:py-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-[#2c090d]/85 via-[#3a0d13]/90 to-[#2c090d]/85 border border-[#d6b46a]/40 shadow-xl backdrop-blur-md opacity-0"
+            className="w-full max-w-[310px] xs:max-w-[340px] sm:max-w-2xl px-3.5 sm:px-6 py-2.5 sm:py-3.5 rounded-2xl bg-gradient-to-r from-[#2c090d]/85 via-[#3a0d13]/90 to-[#2c090d]/85 border border-[#d6b46a]/40 shadow-xl backdrop-blur-md opacity-0"
           >
-            <div className="grid grid-cols-2 gap-1.5 sm:gap-4 items-center divide-x divide-[#d6b46a]/30">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-4 divide-y sm:divide-y-0 sm:divide-x divide-[#d6b46a]/30">
               
-              {/* SISI KIRI: WAKTU */}
-              <div className="flex items-center justify-center gap-1.5 sm:gap-3 pr-1 sm:pr-4">
-                <div className="w-4 h-4 xs:w-5 xs:h-5 sm:w-9 sm:h-9 rounded-full bg-[#1c0406] border border-[#d6b46a]/50 flex items-center justify-center shrink-0 shadow-inner">
-                  <Clock size={10} weight="fill" className="text-[#f5d890] sm:hidden" />
-                  <Clock size={18} weight="fill" className="text-[#f5d890] hidden sm:block" />
+              {/* SISI WAKTU (Atas di HP, Kiri di Desktop) */}
+              <div className="flex items-center gap-3 sm:justify-center sm:pr-4 flex-1">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#1c0406] border border-[#d6b46a]/50 flex items-center justify-center shrink-0 shadow-inner">
+                  <Clock size={16} weight="fill" className="text-[#f5d890]" />
                 </div>
                 <div className="text-left min-w-0">
                   <span
                     style={{ fontFamily: 'var(--font-bodoni), Georgia, serif' }}
-                    className="block text-[7px] sm:text-[10px] tracking-[0.16em] sm:tracking-[0.25em] uppercase text-[#d6b46a] font-semibold"
+                    className="block text-[8.5px] sm:text-[10px] tracking-[0.2em] uppercase text-[#d6b46a] font-semibold"
                   >
                     WAKTU
                   </span>
-                  <span className="block text-[7.5px] xs:text-[8.5px] sm:text-sm font-medium text-[#f5e9d3] leading-tight truncate">
+                  <span className="block text-xs sm:text-sm font-medium text-[#f5e9d3] leading-tight">
                     {formatWibDateOnly(event.eventStartAt)}
                   </span>
-                  <span className="block text-[7px] sm:text-[11px] font-mono text-[#f5d890]/80 leading-tight">
+                  <span className="block text-[10px] sm:text-[11px] font-mono text-[#f5d890]/85 leading-tight">
                     Pukul {formatWibTimeOnly(event.eventStartAt)}
                   </span>
                 </div>
               </div>
 
-              {/* SISI KANAN: TEMPAT */}
-              <div className="flex items-center justify-center gap-1.5 sm:gap-3 pl-1 sm:pl-4">
-                <div className="w-4 h-4 xs:w-5 xs:h-5 sm:w-9 sm:h-9 rounded-full bg-[#1c0406] border border-[#d6b46a]/50 flex items-center justify-center shrink-0 shadow-inner">
-                  <MapPin size={10} weight="fill" className="text-[#f5d890] sm:hidden" />
-                  <MapPin size={18} weight="fill" className="text-[#f5d890] hidden sm:block" />
+              {/* SISI TEMPAT (Bawah di HP, Kanan di Desktop) */}
+              <div className="flex items-center gap-3 sm:justify-center pt-2.5 sm:pt-0 sm:pl-4 flex-1">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#1c0406] border border-[#d6b46a]/50 flex items-center justify-center shrink-0 shadow-inner">
+                  <MapPin size={16} weight="fill" className="text-[#f5d890]" />
                 </div>
                 <div className="text-left min-w-0">
                   <span
                     style={{ fontFamily: 'var(--font-bodoni), Georgia, serif' }}
-                    className="block text-[7px] sm:text-[10px] tracking-[0.16em] sm:tracking-[0.25em] uppercase text-[#d6b46a] font-semibold"
+                    className="block text-[8.5px] sm:text-[10px] tracking-[0.2em] uppercase text-[#d6b46a] font-semibold"
                   >
                     TEMPAT
                   </span>
-                  <span className="block text-[7.5px] xs:text-[8.5px] sm:text-sm font-medium text-[#f5e9d3] leading-tight truncate max-w-[90px] xs:max-w-[110px] sm:max-w-[220px]">
+                  <span className="block text-xs sm:text-sm font-medium text-[#f5e9d3] leading-tight truncate">
                     {event.venueName}
                   </span>
-                  <span className="block text-[7px] sm:text-[11px] text-[#f5d890]/80 font-sans leading-tight truncate max-w-[90px] xs:max-w-[110px] sm:max-w-[220px]">
+                  <span className="block text-[10px] sm:text-[11px] text-[#f5d890]/85 font-sans leading-tight">
                     Telkom University
                   </span>
                 </div>
@@ -359,30 +342,12 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
             </div>
           </div>
 
-          {/* MARQUEE COUNTDOWN TIMER (4 Kotak Lampu Kuning Broadway Proporsional) */}
-          <div ref={countdownSectionRef} className="flex flex-col items-center gap-1 sm:gap-2 mt-0.5 sm:mt-1 w-full max-w-3xl opacity-0">
-            <div className="text-[7.5px] xs:text-[8.5px] sm:text-xs tracking-[0.18em] sm:tracking-[0.25em] uppercase text-[#d6b46a]/90 font-semibold">
+          {/* MARQUEE COUNTDOWN TIMER (2x2 Grid di HP, 4 Kotak Horizontal di Desktop) */}
+          <div ref={countdownSectionRef} className="flex flex-col items-center gap-1.5 sm:gap-2 mt-1 sm:mt-2 w-full max-w-3xl opacity-0">
+            <div className="text-[8.5px] xs:text-[9.5px] sm:text-xs tracking-[0.22em] uppercase text-[#d6b46a]/90 font-semibold">
               {countdown.isPast ? 'Acara Telah Dimulai' : 'Menuju Malam Puncak'}
             </div>
             <TheatreCountdown countdown={countdown} />
-          </div>
-
-          {/* ACTION CALL-TO-ACTIONS (Tetap Samping-Sampingan / Row yang Compact dan Elegan) */}
-          <div ref={ctaSectionRef} className="flex flex-row items-center justify-center gap-2 sm:gap-4 pt-1 sm:pt-2 w-full max-w-[280px] xs:max-w-[320px] sm:max-w-none opacity-0">
-            <Link
-              href="/daftar"
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1 sm:gap-2 px-2 xs:px-3 sm:px-8 py-1.5 sm:py-3.5 rounded-full bg-gradient-to-r from-[#891523] via-[#b52735] to-[#891523] text-[#fffdfa] font-bold text-[8.5px] xs:text-[9.5px] sm:text-sm tracking-normal sm:tracking-wider shadow-[0_4px_16px_rgba(181,39,53,0.55)] border border-[#f5d890]/80 hover:border-[#fef08a] hover:scale-105 active:scale-95 transition-all duration-300 whitespace-nowrap"
-            >
-              <Ticket size={11} weight="fill" className="text-[#f5d890] shrink-0 sm:hidden" />
-              <Ticket size={18} weight="fill" className="text-[#f5d890] shrink-0 hidden sm:block" />
-              <span>PILIH TIKET GRATIS</span>
-            </Link>
-            <a
-              href="#lineup-band"
-              className="flex-1 sm:flex-initial flex items-center justify-center px-2 xs:px-3 sm:px-6 py-1.5 sm:py-3.5 rounded-full bg-[#350a10]/80 text-[#f5e9d3] font-medium text-[8.5px] xs:text-[9.5px] sm:text-sm tracking-normal sm:tracking-wider border border-[#d6b46a]/40 hover:bg-[#520d16] hover:border-[#d6b46a] transition-all whitespace-nowrap"
-            >
-              Lihat Lineup Band
-            </a>
           </div>
 
         </div>

@@ -208,13 +208,10 @@ export function FashionShowcase({ event }: FashionShowcaseProps) {
       ref={containerRef}
       id="fashion-showcase"
       aria-label="Panggung Runway Fashion Show The Velvet Runway MEMORIA"
-      className="relative w-full bg-[#0d0204] text-[#f5e9d3] py-16 sm:py-24 md:py-32 px-4 sm:px-6 lg:px-8 overflow-hidden border-t border-[#d6b46a]/30"
+      className="relative w-full py-16 sm:py-24 md:py-28 px-4 sm:px-6 lg:px-8 overflow-hidden border-t border-[#d6b46a]/30"
     >
-      {/* Background Atmosphere Depth Gradient */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#28070d]/60 via-[#100305] to-[#070102] z-0 pointer-events-none" />
-
       {/* Runway Stage Ambient Warm Glow */}
-      <div className="absolute top-1/2 left-[10%] -translate-y-1/2 w-[550px] h-[550px] bg-[radial-gradient(circle,_rgba(181,39,53,0.14)_0%,_transparent_70%)] blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 left-[8%] -translate-y-1/2 w-[550px] h-[550px] bg-[radial-gradient(circle,_rgba(181,39,53,0.08)_0%,_transparent_70%)] blur-3xl pointer-events-none" />
 
       {/* Main Responsive Alternating Container */}
       <div className="relative z-10 w-full max-w-7xl mx-auto">

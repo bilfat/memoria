@@ -36,7 +36,6 @@ const BULB_COORDINATES = [
   { x: 108, y: 163 },
   { x: 89, y: 163 },
   { x: 70, y: 163 },
-  { x: 51, y: 163 },
   { x: 32, y: 163 },
 
   // Sudut Kiri Bawah
@@ -63,11 +62,11 @@ const MarqueeBulbBox = React.memo(function MarqueeBulbBox({
   boxId: string;
 }) {
   return (
-    <div className="marquee-countdown-box relative w-9 xs:w-11 sm:w-15 md:w-18 lg:w-22 aspect-[1/1.08] flex items-center justify-center select-none group shrink-0">
+    <div className="marquee-countdown-box relative w-24 xs:w-28 sm:w-20 md:w-24 lg:w-28 aspect-[1/1.08] flex items-center justify-center select-none group shrink-0">
       {/* SVG Canvas for Marquee Bulbs & Glowing Metallic Theatre Frame */}
       <svg
         viewBox="0 0 160 175"
-        className="absolute inset-0 w-full h-full drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)]"
+        className="absolute inset-0 w-full h-full drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)]"
       >
         <defs>
           {/* Box Gradient Fill: Deep Burgundy Chocolate Stage Wood */}
@@ -142,7 +141,7 @@ const MarqueeBulbBox = React.memo(function MarqueeBulbBox({
           strokeOpacity="0.45"
         />
 
-        {/* Marquee Bulbs Ring (GPU Accelerated without expensive raster filters) */}
+        {/* Marquee Bulbs Ring */}
         {BULB_COORDINATES.map((coord, i) => (
           <g key={`bulb-${boxId}-${i}`}>
             {/* Ambient Warm Halo behind bulb */}
@@ -169,21 +168,21 @@ const MarqueeBulbBox = React.memo(function MarqueeBulbBox({
         {/* Large Countdown Digits */}
         <span
           style={{ fontFamily: 'var(--font-bodoni), Georgia, serif' }}
-          className="text-xs xs:text-sm sm:text-2xl md:text-3xl lg:text-4xl font-bold text-[#fffaf0] drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] tracking-tight tabular-nums leading-none"
+          className="text-2xl xs:text-3xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-[#fffaf0] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] tracking-tight tabular-nums leading-none"
         >
           {String(value).padStart(2, '0')}
         </span>
 
         {/* Gold Diamond Ornament Divider Line */}
-        <div className="w-4 xs:w-5 sm:w-8 md:w-12 my-0.5 sm:my-1 relative flex items-center justify-center">
+        <div className="w-8 xs:w-9 sm:w-8 md:w-12 my-1 sm:my-1.5 relative flex items-center justify-center">
           <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-[#d4af37] to-transparent opacity-80" />
-          <div className="absolute w-0.5 h-0.5 xs:w-1 xs:h-1 sm:w-1.5 sm:h-1.5 rotate-45 bg-[#fef08a] border border-[#a16207] shadow-[0_0_5px_rgba(250,204,21,0.8)]" />
+          <div className="absolute w-1 xs:w-1.5 sm:w-1.5 rotate-45 bg-[#fef08a] border border-[#a16207] shadow-[0_0_5px_rgba(250,204,21,0.85)]" />
         </div>
 
         {/* Label: DAYS, HOURS, MINUTES, SECONDS */}
         <span
           style={{ fontFamily: 'var(--font-bodoni), serif' }}
-          className="text-[4.5px] xs:text-[5.5px] sm:text-[7.5px] md:text-[9px] font-semibold tracking-[0.16em] sm:tracking-[0.2em] text-[#ebd5aa] uppercase drop-shadow-sm"
+          className="text-[9px] xs:text-[10px] sm:text-[7.5px] md:text-[9px] font-semibold tracking-[0.18em] sm:tracking-[0.2em] text-[#ebd5aa] uppercase drop-shadow-sm"
         >
           {label}
         </span>
@@ -197,7 +196,7 @@ const StarSparkleDivider = React.memo(function StarSparkleDivider() {
     <div className="flex items-center justify-center shrink-0 px-0.5 sm:px-1 z-10">
       <svg
         viewBox="0 0 24 24"
-        className="w-1.5 xs:w-2 sm:w-3 md:w-4 h-1.5 xs:h-2 sm:h-3 md:h-4 drop-shadow-[0_0_8px_rgba(250,204,21,0.85)]"
+        className="w-2.5 sm:w-3 md:w-4 h-2.5 sm:h-3 md:h-4 drop-shadow-[0_0_8px_rgba(250,204,21,0.85)]"
       >
         <defs>
           <radialGradient id="sparkleGrad" cx="50%" cy="50%" r="50%">
@@ -220,7 +219,7 @@ const StarSparkleDivider = React.memo(function StarSparkleDivider() {
 export function TheatreCountdown({ countdown }: TheatreCountdownProps) {
   if (countdown.isPast) {
     return (
-      <div className="py-2 px-6 rounded-full bg-gradient-to-r from-memoria-burgundy to-memoria-stage-red text-memoria-ivory font-bold text-xs sm:text-sm tracking-widest border border-memoria-gold/50 shadow-2xl animate-pulse">
+      <div className="py-2.5 px-6 rounded-full bg-gradient-to-r from-memoria-burgundy to-memoria-stage-red text-memoria-ivory font-bold text-xs sm:text-sm tracking-widest border border-memoria-gold/50 shadow-2xl animate-pulse">
         PERTUNJUKAN TEATER TELAH DIMULAI
       </div>
     );
@@ -234,13 +233,23 @@ export function TheatreCountdown({ countdown }: TheatreCountdownProps) {
   ];
 
   return (
-    <div className="flex items-center justify-center gap-0.5 sm:gap-1 md:gap-2">
-      {units.map((unit, index) => (
-        <React.Fragment key={unit.id}>
-          <MarqueeBulbBox value={unit.val} label={unit.label} boxId={unit.id} />
-          {index < units.length - 1 && <StarSparkleDivider />}
-        </React.Fragment>
-      ))}
+    <div className="w-full flex justify-center">
+      {/* 1. Mobile Layout: 2x2 Grid (1 1 / 1 1) dengan Angka Besar Jelas */}
+      <div className="grid grid-cols-2 gap-3 xs:gap-4 sm:hidden justify-items-center">
+        {units.map((unit) => (
+          <MarqueeBulbBox key={unit.id} value={unit.val} label={unit.label} boxId={unit.id} />
+        ))}
+      </div>
+
+      {/* 2. Tablet & Desktop Layout: 4 Horizontal Boxes with Star Sparkle Dividers */}
+      <div className="hidden sm:flex items-center justify-center gap-1 sm:gap-2 md:gap-3">
+        {units.map((unit, index) => (
+          <React.Fragment key={unit.id}>
+            <MarqueeBulbBox value={unit.val} label={unit.label} boxId={unit.id} />
+            {index < units.length - 1 && <StarSparkleDivider />}
+          </React.Fragment>
+        ))}
+      </div>
     </div>
   );
 }

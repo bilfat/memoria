@@ -189,13 +189,10 @@ export function AwardingShowcase({ event }: AwardingShowcaseProps) {
       ref={containerRef}
       id="awarding-showcase"
       aria-label="Panggung Penghargaan The Golden Moment Awarding MEMORIA"
-      className="relative w-full bg-[#0d0204] text-[#f5e9d3] py-16 sm:py-24 md:py-32 px-4 sm:px-6 lg:px-8 overflow-hidden border-t border-[#d6b46a]/30"
+      className="relative w-full py-16 sm:py-24 md:py-28 px-4 sm:px-6 lg:px-8 overflow-hidden border-t border-[#d6b46a]/30"
     >
-      {/* Background Atmosphere Depth Gradient */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#24060b]/60 via-[#100305] to-[#070102] z-0 pointer-events-none" />
-
       {/* Golden Stage Ambient Dust Glow */}
-      <div className="absolute top-1/2 right-[10%] -translate-y-1/2 w-[550px] h-[550px] bg-[radial-gradient(circle,_rgba(214,180,106,0.12)_0%,_transparent_70%)] blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 right-[8%] -translate-y-1/2 w-[550px] h-[550px] bg-[radial-gradient(circle,_rgba(214,180,106,0.08)_0%,_transparent_70%)] blur-3xl pointer-events-none" />
 
       {/* Main Responsive Container */}
       <div className="relative z-10 w-full max-w-7xl mx-auto">

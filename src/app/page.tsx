@@ -29,21 +29,21 @@ export default function HomePage() {
   }, []);
 
   return (
-    <PublicLayoutShell className="bg-white text-neutral-900">
+    <PublicLayoutShell
+      showLightRays={true}
+      className="bg-[#fcfbf9] text-neutral-900 selection:bg-[#891523] selection:text-white"
+    >
       {/* 1. Theatre Proscenium Stage Hero with GSAP Curtains, Marquee, Countdown & Identity */}
       <TheatreStageHero event={event} />
 
-      {/* Latar Belakang Putih Bersih untuk Section Konten */}
-      <div className="bg-white text-neutral-900 transition-colors">
-        {/* 2. Band Showcase in Asymmetric Alternating Layout */}
-        <BandShowcase bands={bands} />
+      {/* 2. Band Showcase in Asymmetric Alternating Layout */}
+      <BandShowcase bands={bands} />
 
-        {/* 3. The Velvet Runway Fashion Show Stage */}
-        <FashionShowcase event={event} />
+      {/* 3. The Velvet Runway Fashion Show Stage */}
+      <FashionShowcase event={event} />
 
-        {/* 4. The Golden Spotlight Ceremony Awarding Stage (Redesigned Theatrical Stage) */}
-        <AwardingShowcase event={event} />
-      </div>
+      {/* 4. The Golden Spotlight Ceremony Awarding Stage (Redesigned Theatrical Stage) */}
+      <AwardingShowcase event={event} />
     </PublicLayoutShell>
   );
 }

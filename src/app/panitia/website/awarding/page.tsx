@@ -6,6 +6,7 @@ import { eventAdapter } from '@/data/adapters';
 import { mockStore } from '@/data/mock/mockStore';
 import { WinnerAnnouncement, EventContent } from '@/types';
 import { useToast } from '@/components/ui/Toast';
+import { WinnerPhotoUpload } from '@/components/admin/WinnerPhotoUpload';
 import {
   Plus,
   PencilSimple,
@@ -329,13 +330,10 @@ export default function AdminAwardingCMSPage() {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-[#374151] mb-1">URL FOTO / TROPHY</label>
-                  <input
-                    type="text"
-                    value={winnerPhoto}
-                    onChange={(e) => setWinnerPhoto(e.target.value)}
-                    placeholder="/images/award.jpg"
-                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none"
+                  <WinnerPhotoUpload
+                    photo={winnerPhoto}
+                    onChange={(val) => setWinnerPhoto(val)}
+                    onRemove={() => setWinnerPhoto('')}
                   />
                 </div>
 

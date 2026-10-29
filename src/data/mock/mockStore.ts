@@ -76,7 +76,30 @@ function getInitialStore(): MockStoreData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      // Sinkronisasi item baru dari INITIAL_WINNERS jika belum ada di localStorage
+      if (Array.isArray(parsed.winners)) {
+        INITIAL_WINNERS.forEach((seedWin) => {
+          const idx = parsed.winners.findIndex((w: any) => w.id === seedWin.id);
+          if (idx < 0) {
+            parsed.winners.push(seedWin);
+          } else if (seedWin.status === 'PUBLISHED' && !parsed.winners[idx].winnerPhoto) {
+            parsed.winners[idx].status = 'PUBLISHED';
+            parsed.winners[idx].winnerPhoto = seedWin.winnerPhoto;
+          }
+        });
+      }
+
+      // Sinkronisasi foto kandidat dari INITIAL_CANDIDATES jika belum ada
+      if (Array.isArray(parsed.candidates)) {
+        INITIAL_CANDIDATES.forEach((seedCand) => {
+          const idx = parsed.candidates.findIndex((c: any) => c.id === seedCand.id);
+          if (idx >= 0 && seedCand.photo && !parsed.candidates[idx].photo) {
+            parsed.candidates[idx].photo = seedCand.photo;
+          }
+        });
+      }
+      return parsed;
     }
   } catch (err) {
     console.warn('Failed reading mock store from localStorage, using seed', err);

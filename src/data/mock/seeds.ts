@@ -90,6 +90,7 @@ export const INITIAL_WINNERS: WinnerAnnouncement[] = [
     section: 'AWARDING',
     categoryName: 'Smart City Innovator of The Year',
     winnerName: 'Tim SIKC GreenIoT',
+    winnerPhoto: '/images/awarding-trophy-clean.png',
     winnerDescription:
       'Inovasi sistem pemantauan polusi udara mikro berbasis sensor cerdas dan dashboard prediksi cuaca kampus.',
     status: 'PUBLISHED',
@@ -101,10 +102,24 @@ export const INITIAL_WINNERS: WinnerAnnouncement[] = [
     section: 'AWARDING',
     categoryName: 'Outstanding Student Leader',
     winnerName: 'Rian Pratama',
+    winnerPhoto: '/images/fashion-model-clean.png',
     winnerDescription:
-      'Dedikasi luar biasa dalam memimpin proyek kolaborasi riset kota cerdas bersama pemerintah daerah.',
-    status: 'DRAFT',
+      'Dedikasi luar biasa dalam memimpin proyek kolaborasi riset kota cerdas bersama pemerintah daerah dan masyarakat.',
+    status: 'PUBLISHED',
     sortOrder: 2,
+    publishedAt: '2026-10-28T20:45:00+07:00',
+  },
+  {
+    id: 'win-5',
+    section: 'AWARDING',
+    categoryName: 'Digital Arts & Cultural Impact',
+    winnerName: 'Nadia Clarissa & Tim Lumina',
+    winnerPhoto: '/images/awarding-trophy-final.png',
+    winnerDescription:
+      'Karya visual interaktif yang memadukan warisan budaya nusantara dengan teknologi proyeksi panggung teater modern.',
+    status: 'PUBLISHED',
+    sortOrder: 3,
+    publishedAt: '2026-10-28T21:00:00+07:00',
   },
 ];
 
@@ -235,6 +250,7 @@ export const INITIAL_CANDIDATES: Candidate[] = [
     votingId: 'vote-poll-1',
     name: 'Aurelia Salsabila',
     description: 'Nominee #01 — Konsep Crimson Elegance dengan jubah beludru megah',
+    photo: '/images/fashion-model-clean.png',
     sortOrder: 1,
   },
   {
@@ -242,6 +258,7 @@ export const INITIAL_CANDIDATES: Candidate[] = [
     votingId: 'vote-poll-1',
     name: 'Rezky Pratama',
     description: 'Nominee #02 — Konsep Midnight Velvet Tuxedo dengan aksen kerah emas antik',
+    photo: '/images/fashion-model-perfect.png',
     sortOrder: 2,
   },
   {
@@ -249,6 +266,7 @@ export const INITIAL_CANDIDATES: Candidate[] = [
     votingId: 'vote-poll-1',
     name: 'Zahra Kirana',
     description: 'Nominee #03 — Konsep Carnival Premiere Gown dengan ornamen bintang sinematik',
+    photo: '/images/fashion-model.png',
     sortOrder: 3,
   },
   {

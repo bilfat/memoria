@@ -31,23 +31,23 @@ export function AwardingContent({
       {/* 2. MAIN HEADING: The Golden Moment (Bodoni Moda) */}
       <h2
         style={{ fontFamily: 'var(--font-bodoni), Georgia, serif' }}
-        className="awarding-content-item text-3xl sm:text-4xl md:text-5xl lg:text-[3.5rem] font-bold text-white tracking-tight leading-[1.12] mb-4"
+        className="awarding-content-item text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-[3.5rem] font-bold text-[#350a10] tracking-tight leading-[1.12] mb-4 break-words"
       >
-        <span className="block bg-gradient-to-r from-[#ffffff] via-[#f5d890] to-[#cba358] bg-clip-text text-transparent drop-shadow-[0_4px_24px_rgba(214,180,106,0.4)]">
+        <span className="block bg-gradient-to-r from-[#350a10] via-[#891523] to-[#540c14] bg-clip-text text-transparent drop-shadow-xs">
           {title}
         </span>
       </h2>
 
       {/* 3. MINIMAL METALLIC GOLD ORNAMENT DIVIDER */}
       <div className="awarding-content-item w-32 sm:w-44 my-2 sm:my-3 relative flex items-center justify-start">
-        <div className="w-full h-[1.5px] bg-gradient-to-r from-[#f5d890] via-[#d6b46a]/80 to-transparent" />
+        <div className="w-full h-[1.5px] bg-gradient-to-r from-[#d6b46a] via-[#891523]/50 to-transparent" />
         <div className="absolute left-6 w-2 h-2 rotate-45 bg-[#fef08a] border border-[#a16207] shadow-[0_0_8px_rgba(250,204,21,0.85)]" />
       </div>
 
       {/* 4. EDITORIAL DESCRIPTION (DM Sans, dari Data Admin Panitia) */}
       <p
         style={{ fontFamily: 'var(--font-dm-sans), sans-serif' }}
-        className="awarding-content-item text-sm sm:text-base text-[#eacfa4] leading-relaxed font-normal max-w-xl mt-3 mb-6 sm:mb-8 opacity-90"
+        className="awarding-content-item text-sm sm:text-base text-neutral-700 leading-relaxed font-normal max-w-xl mt-3 mb-6 sm:mb-8"
       >
         {description}
       </p>
