@@ -122,7 +122,7 @@ export const RunwayLightingRig = React.forwardRef<HTMLDivElement, RunwayLighting
               {/* Gold Lens Rim */}
               <ellipse cx="0" cy="26" rx="11" ry="3.5" fill="#1c0508" stroke="#f5d890" strokeWidth="1.2" />
               {/* Glowing Bulb Core */}
-              <circle cx="0" cy="26" r="3.8" fill="url(#runwayBulbGlow)" />
+              <circle cx="0" cy="26" r="3.8" fill="url(#runwayBulbGlow)" className="fashion-rig-bulb" />
               {/* Warm Lens Glare */}
               <ellipse cx="0" cy="27" rx="9" ry="2" fill="#fff7bd" opacity="0.6" />
             </g>

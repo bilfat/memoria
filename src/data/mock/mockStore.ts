@@ -99,6 +99,17 @@ function getInitialStore(): MockStoreData {
           }
         });
       }
+
+      // Sinkronisasi judul fashion teaser jika masih memakai judul bahasa Inggris lama
+      if (parsed.event) {
+        if (!parsed.event.fashionTeaser || parsed.event.fashionTeaser.title === 'The Runway Experience') {
+          parsed.event.fashionTeaser = {
+            ...parsed.event.fashionTeaser,
+            title: INITIAL_EVENT_CONTENT.fashionTeaser?.title || 'Panggung Fashion Show',
+          };
+        }
+      }
+
       return parsed;
     }
   } catch (err) {

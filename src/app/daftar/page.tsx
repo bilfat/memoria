@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ticketAdapter } from '@/data/adapters';
 import { mockStore } from '@/data/mock/mockStore';
+import { INITIAL_TICKETS } from '@/data/mock/seeds';
 import { TicketType, TicketAvailabilityStatus } from '@/types';
 import { BrandLogotype } from '@/components/brand/BrandLogotype';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -11,7 +12,9 @@ import { formatWibDateTime } from '@/lib/date';
 import { Ticket, ArrowLeft, CheckCircle, Warning, Clock } from '@phosphor-icons/react';
 
 export default function TicketChooserPage() {
-  const [tickets, setTickets] = useState<TicketType[]>(mockStore.getPublishedTickets());
+  const [tickets, setTickets] = useState<TicketType[]>(() =>
+    INITIAL_TICKETS.filter((t) => t.publication === 'PUBLISHED')
+  );
 
   useEffect(() => {
     ticketAdapter.listPublishedTickets().then(setTickets);

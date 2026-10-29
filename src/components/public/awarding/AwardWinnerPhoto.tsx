@@ -13,59 +13,76 @@ interface AwardWinnerPhotoProps {
 
 /**
  * AwardWinnerPhoto
- * Menampilkan foto pemenang sebagai elemen utama galeri dengan rasio portrait konsisten,
- * sudut membulat elegan (rounded-2xl), spotlight lembut dari atas,
- * dan gold glow pendaran cahaya di bawah foto.
+ * Golden Hall of Fame — Winner Photography Presentation
+ * - Foto adalah fokus utama galeri
+ * - Mendukung transparan PNG/WebP (object-fit: contain + drop-shadow panggung)
+ * - Mendukung foto biasa berlatar belakang (object-fit: cover + rounded-2xl + subtle ring)
+ * - Overhead gallery spotlight dari atas foto
+ * - Golden glow lantai galeri di bawah foto
+ * - Tanpa background box berat atau bingkai tebal yang mengaburkan subjek
  */
 export function AwardWinnerPhoto({ photoUrl, winnerName, categoryName }: AwardWinnerPhotoProps) {
+  // Cek apakah aset berupa file transparan (.png atau .webp)
+  const isTransparent = Boolean(
+    photoUrl && (photoUrl.endsWith('.png') || photoUrl.endsWith('.webp'))
+  );
+
   return (
-    <div className="relative w-full">
-      {/* 1. Gold Glow Base di Bawah Foto */}
+    <div className="relative w-full pt-4">
+      {/* 1. Floor Gold Glow Underneath Photo */}
       <GoldGlowBase />
 
-      {/* 2. Photo Framing Container */}
-      <div className="relative w-full aspect-[4/5] min-h-[360px] sm:min-h-[400px] rounded-2xl overflow-hidden bg-[#FAF6EE] ring-1 ring-[#D6B46A]/30 shadow-[0_10px_25px_rgba(214,180,106,0.18),0_4px_10px_rgba(43,26,18,0.04)] transition-all duration-500 ease-out group-hover:-translate-y-2 group-hover:shadow-[0_20px_35px_rgba(214,180,106,0.28),0_6px_14px_rgba(43,26,18,0.08)] group-hover:ring-[#D6B46A]/60 z-10">
+      {/* 2. Photo Stage Container: Menyatu anggun dengan background galeri */}
+      <div className="award-winner-photo-frame relative w-full aspect-[4/5] min-h-[380px] sm:min-h-[420px] rounded-2xl flex items-end justify-center transition-all duration-700 ease-out group-hover:-translate-y-2 z-10">
         
-        {/* 3. Photo Image or Elegant Neutral Gallery Placeholder */}
+        {/* Overhead Gallery Ceiling Spotlight Fixture & Cone Light Beam */}
+        <SpotlightOverlay />
+
         {photoUrl ? (
-          <img
-            src={photoUrl}
-            alt={`${winnerName} - ${categoryName}`}
-            className="w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-[1.03]"
-            loading="lazy"
-          />
+          isTransparent ? (
+            /* A. Transparent PNG / Silhouette Photography */
+            <div className="relative w-full h-full flex items-end justify-center p-3 sm:p-5 z-10">
+              <img
+                src={photoUrl}
+                alt={`${winnerName} - ${categoryName}`}
+                className="w-full h-full max-h-[94%] object-contain object-bottom drop-shadow-[0_16px_32px_rgba(166,123,57,0.35)] transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                loading="lazy"
+              />
+            </div>
+          ) : (
+            /* B. Regular Photography with Environment Background */
+            <div className="relative w-full h-full rounded-2xl overflow-hidden ring-1 ring-[#D6B46A]/35 shadow-[0_12px_28px_rgba(166,123,57,0.18)] z-10 transition-all duration-700 group-hover:shadow-[0_20px_42px_rgba(214,180,106,0.32)]">
+              <img
+                src={photoUrl}
+                alt={`${winnerName} - ${categoryName}`}
+                className="w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                loading="lazy"
+              />
+              {/* Subtle Inner Ring Highlight */}
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 pointer-events-none rounded-2xl ring-1 ring-inset ring-[#FFFFFF]/45"
+              />
+            </div>
+          )
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-[#FDFBF7] via-[#F7F2E7] to-[#EFE7D5] relative overflow-hidden select-none">
-            {/* Subtle background ambient ring */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,_rgba(214,180,106,0.15)_0%,_transparent_65%)]" />
-
+          /* C. Elegant Neutral Fallback Crest */
+          <div className="w-full h-full rounded-2xl flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-[#FFFDF8] via-[#FAF5EB] to-[#F3EADA] border border-[#D6B46A]/30 shadow-[0_10px_25px_rgba(214,180,106,0.12)] relative overflow-hidden select-none z-10">
             <div className="relative z-10 flex flex-col items-center">
-              {/* Minimalist Gold Monogram Medal */}
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FFFDF9] to-[#F3E8D2] border border-[#D6B46A]/50 shadow-[0_6px_20px_rgba(214,180,106,0.2)] flex items-center justify-center mb-4 transition-transform duration-500 group-hover:scale-105">
-                <Trophy size={36} weight="fill" className="text-[#C8A252]" />
+                <Trophy size={36} weight="fill" className="text-[#A67B39]" />
               </div>
-
-              <div className="flex items-center gap-1.5 text-[11px] font-mono tracking-[0.2em] text-[#8B6E32] uppercase font-semibold">
+              <div className="flex items-center gap-1.5 text-[11px] font-mono tracking-[0.2em] text-[#A67B39] uppercase font-semibold">
                 <Sparkle size={12} weight="fill" className="text-[#D6B46A]" />
                 <span>MEMORIA HONORS</span>
               </div>
-              <p className="text-xs text-[#8A7463] mt-1 max-w-[200px]">
-                Dokumentasi Penghargaan Kehormatan
+              <p className="text-xs text-[#7B6050] mt-1 max-w-[200px]">
+                Dokumentasi Penerima Anugerah
               </p>
             </div>
           </div>
         )}
-
-        {/* 4. Gallery Spotlight Overlay (Cahaya Sorot dari Atas) */}
-        <SpotlightOverlay />
-
-        {/* 5. Minimalist Frame Inner Vignette */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 pointer-events-none rounded-2xl shadow-[inset_0_0_20px_rgba(214,180,106,0.12)] z-15"
-        />
       </div>
     </div>
   );
 }
-

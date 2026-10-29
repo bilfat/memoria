@@ -28,9 +28,9 @@ export const INITIAL_EVENT_CONTENT: EventContent = {
   heroImage: '/brand/og-cover.webp',
   footerText: 'MEMORIA 2026 — Himpunan Mahasiswa D4 Sistem Informasi Kota Cerdas, Fakultas Ilmu Terapan.',
   fashionTeaser: {
-    title: 'The Runway Experience',
+    title: 'Panggung Fashion Show',
     description:
-      'Panggung runway berbalut beludru merah dengan parade busana haute couture & carnival theatrical yang memukau.',
+      'Panggung runway berbalut beludru merah dengan parade busana haute couture & carnival theatrical yang memukau karya civitas akademika SIKC.',
   },
   awardingTeaser: {
     title: 'The Golden Moment Awarding',
@@ -69,6 +69,7 @@ export const INITIAL_WINNERS: WinnerAnnouncement[] = [
     section: 'FASHION_SHOW',
     categoryName: 'Best Velvet Costume',
     winnerName: 'Aura Natasya & Tim Lumina',
+    winnerPhoto: '/images/fashion-model-clean.png',
     winnerDescription:
       'Konsep gaun couture beludru merah dengan aksen benang emas antik yang memancarkan keanggunan teater klasik.',
     status: 'PUBLISHED',
@@ -80,10 +81,36 @@ export const INITIAL_WINNERS: WinnerAnnouncement[] = [
     section: 'FASHION_SHOW',
     categoryName: 'Most Dramatic Runway Walk',
     winnerName: 'Dimas Rayhan',
+    winnerPhoto: '/images/fashion-model-perfect.png',
     winnerDescription:
       'Langkah runway memukau dengan transisi siluet dramatis yang disambut tepuk tangan meriah seluruh penonton.',
-    status: 'DRAFT',
+    status: 'PUBLISHED',
     sortOrder: 2,
+    publishedAt: '2026-10-28T20:15:00+07:00',
+  },
+  {
+    id: 'win-fs-3',
+    section: 'FASHION_SHOW',
+    categoryName: 'Avant-Garde Theatrical Look',
+    winnerName: 'Clarissa Maharani',
+    winnerPhoto: '/images/fashion-model-clean.png',
+    winnerDescription:
+      'Eksplorasi siluet avant-garde dengan jubah beludru megah bertabur aksen kristal emas bergaya panggung opera.',
+    status: 'PUBLISHED',
+    sortOrder: 3,
+    publishedAt: '2026-10-28T20:25:00+07:00',
+  },
+  {
+    id: 'win-fs-4',
+    section: 'FASHION_SHOW',
+    categoryName: 'Audience Choice Runway Model',
+    winnerName: 'Reyhan Pratama & Kreasia',
+    winnerPhoto: '/images/fashion-model-clean.png',
+    winnerDescription:
+      'Penampilan penuh karisma dan daya pikat panggung yang berhasil meraih simpati tertinggi dari civitas akademika.',
+    status: 'PUBLISHED',
+    sortOrder: 4,
+    publishedAt: '2026-10-28T20:35:00+07:00',
   },
   {
     id: 'win-3',

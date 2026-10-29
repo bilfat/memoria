@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { participantAdapter, ticketAdapter, eventAdapter } from '@/data/adapters';
 import { mockStore } from '@/data/mock/mockStore';
+import { INITIAL_EVENT_CONTENT } from '@/data/mock/seeds';
 import { Participant, TicketIdentity, TicketType, EventContent } from '@/types';
 import { BrandLogotype } from '@/components/brand/BrandLogotype';
 import { ToastProvider, useToast } from '@/components/ui/Toast';
@@ -20,7 +21,7 @@ function RegistrationSuccessContent() {
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [identity, setIdentity] = useState<TicketIdentity | null>(null);
   const [ticketType, setTicketType] = useState<TicketType | null>(null);
-  const [event, setEvent] = useState<EventContent>(mockStore.getEvent());
+  const [event, setEvent] = useState<EventContent>(INITIAL_EVENT_CONTENT);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [downloading, setDownloading] = useState(false);
 

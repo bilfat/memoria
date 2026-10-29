@@ -81,12 +81,20 @@ export function PublicNavbar() {
     };
   }, [updateIndicatorPosition, hoveredHref]);
 
+  const isLightNav = pathname.startsWith('/awarding') || pathname.startsWith('/fashion-show');
+
   return (
-    <header className="sticky top-0 z-50 w-full backdrop-blur-md bg-memoria-midnight/85 border-b border-memoria-gold/20 transition-all duration-300">
+    <header
+      className={`sticky top-0 z-50 w-full backdrop-blur-md transition-all duration-300 ${
+        isLightNav
+          ? 'bg-[#FFFDF8]/92 border-b border-[#D6B46A]/30 shadow-[0_4px_20px_rgba(214,180,106,0.12)]'
+          : 'bg-memoria-midnight/85 border-b border-memoria-gold/20'
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Brand Link */}
         <Link href="/" className="flex items-center gap-2 group focus:outline-none">
-          <BrandLogotype size="md" showSubtitle={false} />
+          <BrandLogotype size="md" showSubtitle={false} variant={isLightNav ? 'dark' : 'light'} />
         </Link>
 
         {/* Desktop Navigation with Smooth Interactive Sliding Indicator */}
@@ -106,7 +114,11 @@ export function PublicNavbar() {
                 }}
                 onMouseEnter={() => setHoveredHref(link.href)}
                 className={`relative py-1 text-sm tracking-wider font-medium transition-colors duration-250 select-none ${
-                  isActive
+                  isLightNav
+                    ? isActive
+                      ? 'text-[#891523] font-bold'
+                      : 'text-[#7B6050] hover:text-[#3E2418]'
+                    : isActive
                     ? 'text-memoria-gold font-semibold'
                     : 'text-memoria-ivory/80 hover:text-memoria-ivory'
                 }`}
@@ -138,7 +150,11 @@ export function PublicNavbar() {
         <div className="hidden md:flex items-center gap-4">
           <Link
             href="/panitia/login"
-            className="flex items-center gap-1.5 text-xs text-memoria-champagne/60 hover:text-memoria-champagne transition-colors py-1.5 px-3 rounded-full border border-memoria-gold/20 hover:border-memoria-gold/50"
+            className={`flex items-center gap-1.5 text-xs transition-colors py-1.5 px-3 rounded-full border ${
+              isLightNav
+                ? 'text-[#7B6050] border-[#D6B46A]/35 hover:border-[#D6B46A] hover:text-[#3E2418] hover:bg-[#F9F4EA]'
+                : 'text-memoria-champagne/60 hover:text-memoria-champagne border-memoria-gold/20 hover:border-memoria-gold/50'
+            }`}
             title="Portal Internal Panitia"
           >
             <LockKey size={14} />
@@ -150,7 +166,9 @@ export function PublicNavbar() {
         <div className="flex md:hidden items-center gap-3">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-memoria-ivory hover:text-memoria-gold focus:outline-none"
+            className={`p-2 focus:outline-none transition-colors ${
+              isLightNav ? 'text-[#3E2418] hover:text-[#891523]' : 'text-memoria-ivory hover:text-memoria-gold'
+            }`}
             aria-label="Buka menu navigasi"
           >
             {mobileMenuOpen ? <X size={26} /> : <List size={26} />}
@@ -160,7 +178,13 @@ export function PublicNavbar() {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-memoria-gold/20 bg-memoria-dark-wine/95 backdrop-blur-xl px-5 pt-3 pb-6 flex flex-col gap-4 animate-in slide-in-from-top-2 duration-200">
+        <div
+          className={`md:hidden border-b px-5 pt-3 pb-6 flex flex-col gap-4 animate-in slide-in-from-top-2 duration-200 ${
+            isLightNav
+              ? 'border-[#D6B46A]/25 bg-[#FFFDF8]/98 backdrop-blur-xl text-[#3E2418]'
+              : 'border-memoria-gold/20 bg-memoria-dark-wine/95 backdrop-blur-xl text-memoria-ivory'
+          }`}
+        >
           {NAV_LINKS.map((link) => {
             const isActive = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
             return (
@@ -169,24 +193,38 @@ export function PublicNavbar() {
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
                 className={`py-2 text-base font-medium transition-all duration-300 flex items-center justify-between ${
-                  isActive
+                  isLightNav
+                    ? isActive
+                      ? 'text-[#891523] font-bold border-l-2 border-[#891523] pl-3 bg-[#F9F4EA] rounded-r-lg'
+                      : 'text-[#7B6050] hover:text-[#3E2418] pl-2'
+                    : isActive
                     ? 'text-memoria-gold font-bold border-l-2 border-memoria-gold pl-3 bg-memoria-burgundy/20 rounded-r-lg'
                     : 'text-memoria-ivory/80 hover:text-memoria-ivory pl-2'
                 }`}
               >
                 <span>{link.label}</span>
                 {isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-memoria-gold shadow-[0_0_8px_rgba(214,180,106,0.9)]" />
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      isLightNav ? 'bg-[#891523]' : 'bg-memoria-gold shadow-[0_0_8px_rgba(214,180,106,0.9)]'
+                    }`}
+                  />
                 )}
               </Link>
             );
           })}
-          <div className="pt-2 border-t border-memoria-gold/15 flex justify-between items-center text-xs text-memoria-champagne/70">
+          <div
+            className={`pt-2 border-t flex justify-between items-center text-xs ${
+              isLightNav ? 'border-[#D6B46A]/20 text-[#7B6050]' : 'border-memoria-gold/15 text-memoria-champagne/70'
+            }`}
+          >
             <span>Diesnatalis SIKC 2026</span>
             <Link
               href="/panitia/login"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-1 text-memoria-gold hover:underline"
+              className={`flex items-center gap-1 font-semibold ${
+                isLightNav ? 'text-[#891523] hover:underline' : 'text-memoria-gold hover:underline'
+              }`}
             >
               <LockKey size={14} />
               <span>Login Panitia</span>

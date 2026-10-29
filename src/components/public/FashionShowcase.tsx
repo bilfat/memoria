@@ -63,14 +63,18 @@ export function FashionShowcase({ event }: FashionShowcaseProps) {
         typeof window !== 'undefined' &&
         window.location.search.includes('skipIntro=1');
 
+      const edgeLights = containerRef.current?.querySelectorAll('.fashion-edge-light');
+      const rigBulbs = containerRef.current?.querySelectorAll('.fashion-rig-bulb');
+      const contentItems = containerRef.current?.querySelectorAll('.fashion-content-item');
+
       // Jika reduced motion atau skip param aktif, langsung tampilkan semua elemen dalam posisi final
       if (prefersReduced || isSkipParam) {
         if (lightingRigRef.current) gsap.set(lightingRigRef.current, { opacity: 1, y: 0 });
         if (spotlightsRef.current) gsap.set(spotlightsRef.current, { opacity: 1, scaleY: 1 });
         if (modelRef.current) gsap.set(modelRef.current, { opacity: 1, y: 0, scale: 1 });
-        gsap.set('.fashion-edge-light', { opacity: 1 });
-        gsap.set('.fashion-rig-bulb', { opacity: 1 });
-        gsap.set('.fashion-content-item', { opacity: 1, y: 0 });
+        if (edgeLights && edgeLights.length > 0) gsap.set(edgeLights, { opacity: 1 });
+        if (rigBulbs && rigBulbs.length > 0) gsap.set(rigBulbs, { opacity: 1 });
+        if (contentItems && contentItems.length > 0) gsap.set(contentItems, { opacity: 1, y: 0 });
         return;
       }
 
@@ -78,9 +82,9 @@ export function FashionShowcase({ event }: FashionShowcaseProps) {
       if (lightingRigRef.current) gsap.set(lightingRigRef.current, { opacity: 0, y: -40 });
       if (spotlightsRef.current) gsap.set(spotlightsRef.current, { opacity: 0, scaleY: 0.65 });
       if (modelRef.current) gsap.set(modelRef.current, { opacity: 0, y: 45, scale: 0.9 });
-      gsap.set('.fashion-edge-light', { opacity: 0.3 });
-      gsap.set('.fashion-rig-bulb', { opacity: 0.25 });
-      gsap.set('.fashion-content-item', { opacity: 0, y: 25 });
+      if (edgeLights && edgeLights.length > 0) gsap.set(edgeLights, { opacity: 0.3 });
+      if (rigBulbs && rigBulbs.length > 0) gsap.set(rigBulbs, { opacity: 0.25 });
+      if (contentItems && contentItems.length > 0) gsap.set(contentItems, { opacity: 0, y: 25 });
 
       if (!hasTriggered) return;
 
@@ -103,102 +107,109 @@ export function FashionShowcase({ event }: FashionShowcaseProps) {
         ease: 'power3.out',
       })
 
-      // =========================================================
-      // SCENE B: Runway Edge Lights Sequential Activation (Back to Front)
-      // =========================================================
-      .to(
-        '.fashion-edge-light',
-        {
-          opacity: 1,
-          stagger: {
-            each: 0.05,
-            from: 'start',
+        // =========================================================
+        // SCENE B: Runway Edge Lights Sequential Activation (Back to Front)
+        // =========================================================
+        if (edgeLights && edgeLights.length > 0) {
+          tl.to(
+            edgeLights,
+            {
+              opacity: 1,
+              stagger: {
+                each: 0.05,
+                from: 'start',
+              },
+              duration: 0.6,
+              ease: 'power2.inOut',
+            },
+            '-=0.6'
+          );
+        }
+
+        if (rigBulbs && rigBulbs.length > 0) {
+          tl.to(
+            rigBulbs,
+            {
+              opacity: 1,
+              stagger: {
+                each: 0.04,
+                from: 'center',
+              },
+              duration: 0.5,
+              ease: 'power2.inOut',
+            },
+            '-=0.5'
+          );
+        }
+
+        // =========================================================
+        // SCENE C: Volumetric Runway Spotlights Power Up
+        // =========================================================
+        tl.to(
+          spotlightsRef.current,
+          {
+            opacity: 1,
+            scaleY: 1,
+            duration: 0.9,
+            ease: 'power2.out',
           },
-          duration: 0.6,
-          ease: 'power2.inOut',
-        },
-        '-=0.6'
-      )
-      .to(
-        '.fashion-rig-bulb',
-        {
-          opacity: 1,
-          stagger: {
-            each: 0.04,
-            from: 'center',
+          '-=0.4'
+        )
+
+        // =========================================================
+        // SCENE D: Model Entrance (Depth Walk down the catwalk)
+        // =========================================================
+        .to(
+          modelRef.current,
+          {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 1.3,
+            ease: 'power3.out',
           },
-          duration: 0.5,
-          ease: 'power2.inOut',
-        },
-        '-=0.5'
-      )
+          '-=0.6'
+        )
 
-      // =========================================================
-      // SCENE C: Volumetric Runway Spotlights Power Up
-      // =========================================================
-      .to(
-        spotlightsRef.current,
-        {
-          opacity: 1,
-          scaleY: 1,
-          duration: 0.9,
-          ease: 'power2.out',
-        },
-        '-=0.4'
-      )
-
-      // =========================================================
-      // SCENE D: Model Entrance (Depth Walk down the catwalk)
-      // =========================================================
-      .to(
-        modelRef.current,
-        {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          duration: 1.3,
-          ease: 'power3.out',
-        },
-        '-=0.6'
-      )
-
-      // =========================================================
-      // SCENE E: Golden Gown Light Sweep
-      // =========================================================
-      .fromTo(
-        lightSweepRef.current,
-        {
-          xPercent: -120,
-          opacity: 0,
-        },
-        {
-          xPercent: 180,
-          opacity: 0.85,
-          duration: 0.85,
-          ease: 'power2.inOut',
-          onComplete: () => {
-            if (lightSweepRef.current) {
-              gsap.to(lightSweepRef.current, { opacity: 0, duration: 0.3 });
-            }
+        // =========================================================
+        // SCENE E: Golden Gown Light Sweep
+        // =========================================================
+        .fromTo(
+          lightSweepRef.current,
+          {
+            xPercent: -120,
+            opacity: 0,
           },
-        },
-        '-=0.4'
-      )
+          {
+            xPercent: 180,
+            opacity: 0.85,
+            duration: 0.85,
+            ease: 'power2.inOut',
+            onComplete: () => {
+              if (lightSweepRef.current) {
+                gsap.to(lightSweepRef.current, { opacity: 0, duration: 0.3 });
+              }
+            },
+          },
+          '-=0.4'
+        )
 
-      // =========================================================
-      // SCENE F: Editorial Content Reveal
-      // =========================================================
-      .to(
-        '.fashion-content-item',
-        {
-          opacity: 1,
-          y: 0,
-          stagger: 0.12,
-          duration: 0.8,
-          ease: 'power2.out',
-        },
-        '-=0.5'
-      );
+        // =========================================================
+        // SCENE F: Editorial Content Reveal
+        // =========================================================
+        if (contentItems && contentItems.length > 0) {
+          tl.to(
+            contentItems,
+            {
+              opacity: 1,
+              y: 0,
+              stagger: 0.12,
+              duration: 0.8,
+              ease: 'power2.out',
+            },
+            '-=0.5'
+          );
+        }
     },
     { dependencies: [hasTriggered], scope: containerRef }
   );
@@ -216,7 +227,7 @@ export function FashionShowcase({ event }: FashionShowcaseProps) {
       {/* Main Responsive Alternating Container */}
       <div className="relative z-10 w-full max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-          
+
           {/* SISI KIRI: ANIMATED RUNWAY STAGE (58% Dominan Visual di Desktop, Atas di Mobile) */}
           <div className="lg:col-span-7 order-1 lg:order-1 w-full">
             <FashionStage

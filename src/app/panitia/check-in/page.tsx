@@ -6,6 +6,7 @@ import { checkinAdapter, participantAdapter, invitationAdapter } from '@/data/ad
 import { useToast } from '@/components/ui/Toast';
 import { CheckinRecord, Participant, LecturerInvitation } from '@/types';
 import { formatWibDateTime } from '@/lib/date';
+import { CameraQrScanner } from '@/components/panitia/check-in/CameraQrScanner';
 import {
   QrCode,
   MagnifyingGlass,
@@ -37,7 +38,7 @@ export default function CheckinPage() {
   const [scanError, setScanError] = useState<string | null>(null);
 
   // Manual search state
-  const [manualType, setManualType] = useState<'MAHASISWA' | 'DOSEN'>('MAHASISWA');
+  const [manualType, setManualType] = useState<'MAHASISWA' | 'DOSEN' | 'TOKEN'>('MAHASISWA');
   const [manualQuery, setManualQuery] = useState('');
   const [manualResult, setManualResult] = useState<{
     subjectType: 'MAHASISWA' | 'DOSEN';
@@ -119,6 +120,16 @@ export default function CheckinPage() {
     setLoading(true);
 
     try {
+      if (manualType === 'TOKEN' || q.startsWith('qr_') || q.startsWith('qr-')) {
+        const res = await checkinAdapter.lookupByQr(q);
+        setManualResult({
+          subjectType: res.subjectType,
+          subject: res.subject,
+          existingCheckin: res.existingCheckin,
+        });
+        return;
+      }
+
       if (manualType === 'MAHASISWA') {
         const res = await checkinAdapter.lookupManualStudent(q);
         setManualResult({
@@ -268,43 +279,24 @@ export default function CheckinPage() {
         {activeTab === 'SCAN' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left 2 Cols: Scanner & Input */}
+              {/* Left 2 Cols: Live Camera Scanner */}
               <div className="lg:col-span-2 space-y-4">
-                <div className="bg-white rounded-xl border border-neutral-200 p-6 space-y-4">
+                <div className="bg-white rounded-xl border border-neutral-200 p-6 space-y-4 shadow-sm">
                   <div>
                     <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-                      <QrCode size={18} />
-                      Pemindai QR Code Tiket / Undangan
+                      <QrCode size={18} className="text-emerald-600" />
+                      Pemindai Kamera QR Code Tiket / Undangan
                     </h3>
                     <p className="text-xs text-neutral-500 mt-1">
-                      Arahkan barcode scanner fisik atau masukkan token QR di bawah. Sistem secara otomatis
-                      mendeteksi identitas Mahasiswa atau Dosen tanpa perlu memilih kategori manual.
+                      Arahkan kamera ke QR Code e-ticket Mahasiswa atau lembar undangan Dosen untuk presensi instan. Sistem otomatis mendeteksi identitas tamu tanpa perlu memilih kategori manual.
                     </p>
                   </div>
 
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleLookupQr();
-                    }}
-                    className="flex gap-2"
-                  >
-                    <input
-                      type="text"
-                      autoFocus
-                      value={qrInput}
-                      onChange={(e) => setQrInput(e.target.value)}
-                      placeholder="Tempel / Scan token QR tiket di sini (e.g. qr-part-... atau qr-dsn-...)"
-                      className="flex-1 px-3.5 py-2.5 text-xs font-mono rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900"
-                    />
-                    <button
-                      type="submit"
-                      disabled={loading || !qrInput.trim()}
-                      className="px-5 py-2.5 bg-neutral-900 text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 disabled:opacity-50"
-                    >
-                      {loading ? 'Memeriksa...' : 'Cari Data'}
-                    </button>
-                  </form>
+                  {/* Real-Time Camera Scanner */}
+                  <CameraQrScanner
+                    onScan={(token) => handleLookupQr(token)}
+                    isProcessing={loading}
+                  />
 
                   {/* Quick Click Samples for Demo & Testing */}
                   <div className="p-4 rounded-xl border border-dashed border-neutral-300 bg-neutral-50/70 space-y-2">
@@ -317,7 +309,7 @@ export default function CheckinPage() {
                           key={s.nim}
                           type="button"
                           onClick={() => handleLookupQr(s.qrToken)}
-                          className="px-2.5 py-1 text-[11px] rounded border border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-700 flex items-center gap-1.5"
+                          className="px-2.5 py-1 text-[11px] rounded border border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-700 flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
                         >
                           <GraduationCap size={13} className="text-emerald-600" />
                           <span>{s.name} ({s.nim})</span>
@@ -328,7 +320,7 @@ export default function CheckinPage() {
                           key={l.code}
                           type="button"
                           onClick={() => handleLookupQr(l.qrToken)}
-                          className="px-2.5 py-1 text-[11px] rounded border border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-700 flex items-center gap-1.5"
+                          className="px-2.5 py-1 text-[11px] rounded border border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-700 flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
                         >
                           <IdentificationBadge size={13} className="text-amber-600" />
                           <span>{l.name} ({l.code})</span>
@@ -459,13 +451,13 @@ export default function CheckinPage() {
           <div className="space-y-6">
             <div className="max-w-2xl bg-white rounded-xl border border-neutral-200 p-6 space-y-4">
               <div>
-                <h3 className="text-sm font-bold text-neutral-900">Pencarian Presensi Manual</h3>
+                <h3 className="text-sm font-bold text-neutral-900">Pencarian & Input Presensi Manual</h3>
                 <p className="text-xs text-neutral-500 mt-0.5">
-                  Digunakan jika perangkat tamu bermasalah atau barcode tiket tidak dapat dipindai.
+                  Digunakan untuk memasukkan data presensi secara manual (NIM Mahasiswa, Email/Kode Dosen, atau Token QR tiket) jika kamera scanner bermasalah.
                 </p>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <label className="flex items-center gap-2 text-xs font-medium text-neutral-700 cursor-pointer">
                   <input
                     type="radio"
@@ -479,7 +471,7 @@ export default function CheckinPage() {
                     }}
                     className="accent-neutral-900"
                   />
-                  <span>Mahasiswa (Cari berdasarkan NIM)</span>
+                  <span>Mahasiswa (Cari NIM)</span>
                 </label>
 
                 <label className="flex items-center gap-2 text-xs font-medium text-neutral-700 cursor-pointer">
@@ -495,7 +487,23 @@ export default function CheckinPage() {
                     }}
                     className="accent-neutral-900"
                   />
-                  <span>Dosen (Cari Email / Kode Undangan)</span>
+                  <span>Dosen (Cari Email / Kode)</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs font-medium text-neutral-700 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="manualType"
+                    value="TOKEN"
+                    checked={manualType === 'TOKEN'}
+                    onChange={() => {
+                      setManualType('TOKEN');
+                      setManualResult(null);
+                      setManualError(null);
+                    }}
+                    className="accent-neutral-900"
+                  />
+                  <span>Token QR Tiket Manual</span>
                 </label>
               </div>
 
@@ -506,8 +514,10 @@ export default function CheckinPage() {
                   onChange={(e) => setManualQuery(e.target.value)}
                   placeholder={
                     manualType === 'MAHASISWA'
-                      ? 'Masukkan NIM Mahasiswa (contoh: 7708230001)'
-                      : 'Masukkan Email atau Kode Dosen (contoh: DSN-001)'
+                      ? 'Masukkan NIM Mahasiswa (contoh: 7708220001)'
+                      : manualType === 'DOSEN'
+                      ? 'Masukkan Email atau Kode Dosen (contoh: DOSEN-HND-01)'
+                      : 'Tempel / Masukkan token QR tiket (contoh: qr_mhs_... atau qr_dsn_...)'
                   }
                   className="flex-1 px-3.5 py-2.5 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900"
                 />
@@ -516,7 +526,7 @@ export default function CheckinPage() {
                   disabled={loading || !manualQuery.trim()}
                   className="px-5 py-2.5 bg-neutral-900 text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 disabled:opacity-50"
                 >
-                  {loading ? 'Mencari...' : 'Cari'}
+                  {loading ? 'Mencari...' : 'Cari Data'}
                 </button>
               </form>
 
