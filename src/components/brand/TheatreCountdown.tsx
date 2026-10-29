@@ -62,7 +62,7 @@ const MarqueeBulbBox = React.memo(function MarqueeBulbBox({
   boxId: string;
 }) {
   return (
-    <div className="marquee-countdown-box relative w-24 xs:w-28 sm:w-20 md:w-24 lg:w-28 aspect-[1/1.08] flex items-center justify-center select-none group shrink-0">
+    <div className="marquee-countdown-box relative w-[88px] xs:w-[98px] sm:w-20 md:w-24 lg:w-28 aspect-[1/1.08] flex items-center justify-center select-none group shrink-0">
       {/* SVG Canvas for Marquee Bulbs & Glowing Metallic Theatre Frame */}
       <svg
         viewBox="0 0 160 175"
@@ -168,13 +168,13 @@ const MarqueeBulbBox = React.memo(function MarqueeBulbBox({
         {/* Large Countdown Digits */}
         <span
           style={{ fontFamily: 'var(--font-bodoni), Georgia, serif' }}
-          className="text-2xl xs:text-3xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-[#fffaf0] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] tracking-tight tabular-nums leading-none"
+          className="text-2xl xs:text-[27px] sm:text-2xl md:text-3xl lg:text-4xl font-bold text-[#fffaf0] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] tracking-tight tabular-nums leading-none"
         >
           {String(value).padStart(2, '0')}
         </span>
 
         {/* Gold Diamond Ornament Divider Line */}
-        <div className="w-8 xs:w-9 sm:w-8 md:w-12 my-1 sm:my-1.5 relative flex items-center justify-center">
+        <div className="w-7 xs:w-8 sm:w-8 md:w-12 my-0.5 sm:my-1.5 relative flex items-center justify-center">
           <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-[#d4af37] to-transparent opacity-80" />
           <div className="absolute w-1 xs:w-1.5 sm:w-1.5 rotate-45 bg-[#fef08a] border border-[#a16207] shadow-[0_0_5px_rgba(250,204,21,0.85)]" />
         </div>
@@ -182,7 +182,7 @@ const MarqueeBulbBox = React.memo(function MarqueeBulbBox({
         {/* Label: DAYS, HOURS, MINUTES, SECONDS */}
         <span
           style={{ fontFamily: 'var(--font-bodoni), serif' }}
-          className="text-[9px] xs:text-[10px] sm:text-[7.5px] md:text-[9px] font-semibold tracking-[0.18em] sm:tracking-[0.2em] text-[#ebd5aa] uppercase drop-shadow-sm"
+          className="text-[8px] xs:text-[9px] sm:text-[7.5px] md:text-[9px] font-semibold tracking-[0.16em] sm:tracking-[0.2em] text-[#ebd5aa] uppercase drop-shadow-sm"
         >
           {label}
         </span>
@@ -235,7 +235,7 @@ export function TheatreCountdown({ countdown }: TheatreCountdownProps) {
   return (
     <div className="w-full flex justify-center">
       {/* 1. Mobile Layout: 2x2 Grid (1 1 / 1 1) dengan Angka Besar Jelas */}
-      <div className="grid grid-cols-2 gap-3 xs:gap-4 sm:hidden justify-items-center">
+      <div className="grid grid-cols-2 gap-2.5 xs:gap-3.5 sm:hidden justify-items-center">
         {units.map((unit) => (
           <MarqueeBulbBox key={unit.id} value={unit.val} label={unit.label} boxId={unit.id} />
         ))}

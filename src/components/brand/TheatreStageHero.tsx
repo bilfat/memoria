@@ -243,7 +243,7 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
       {/* LAYER 1: GRAND THEATRICAL PROSCENIUM STAGE CONTAINER */}
       {/* Panggung teater berdiri proporsional (tidak gepeng) di tengah kanvas */}
       {/* ========================================================= */}
-      <div className="relative w-full max-w-6xl xl:max-w-7xl mx-auto rounded-[24px] sm:rounded-[50px] shadow-[0_25px_70px_rgba(20,8,9,0.25),0_10px_25px_rgba(0,0,0,0.15)] overflow-hidden bg-[#140809] border border-[#d6b46a]/40 min-h-[560px] xs:min-h-[600px] sm:min-h-[700px] md:min-h-[820px] lg:min-h-[880px] flex items-center justify-center">
+      <div className="relative w-full max-w-6xl xl:max-w-7xl mx-auto rounded-[24px] sm:rounded-[50px] shadow-[0_25px_70px_rgba(20,8,9,0.25),0_10px_25px_rgba(0,0,0,0.15)] overflow-hidden bg-[#140809] border border-[#d6b46a]/40 min-h-[660px] xs:min-h-[700px] sm:min-h-[740px] md:min-h-[820px] lg:min-h-[880px] flex items-center justify-center">
 
         {/* 1. Backdrop Ambient Texture & Dark Velvet Gradient */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#350a10] via-[#1a0508] to-[#0c0204] z-0" />
@@ -267,10 +267,10 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
         {/* ========================================================= */}
         {/* LAYER 6, 7, 8: CENTERSTAGE HERO CONTENT */}
         {/* ========================================================= */}
-        <div className="relative z-10 w-full min-w-0 max-w-4xl mx-auto px-3 sm:px-8 text-center flex flex-col items-center gap-4 sm:gap-6 pt-12 xs:pt-14 sm:pt-22 md:pt-26 pb-12 xs:pb-14 sm:pb-22 md:pb-26">
+        <div className="relative z-10 w-full min-w-0 max-w-4xl mx-auto px-3 sm:px-8 text-center flex flex-col items-center gap-3 xs:gap-3.5 sm:gap-5 md:gap-6 pt-16 xs:pt-18 sm:pt-22 md:pt-26 pb-20 xs:pb-24 sm:pb-24 md:pb-28">
 
-          {/* MAIN SIGN: MEMORIA (Font Ballet, Besar & Megah dengan Keterbacaan Penuh di Semua Layar) */}
-          <div ref={memoriaTitleRef} className="flex flex-col items-center select-none pt-1 sm:pt-3 px-2 overflow-visible opacity-0">
+          {/* MAIN SIGN: MEMORIA (Font Ballet, Rapi & Anggun dengan Keterbacaan Penuh di Semua Layar) */}
+          <div ref={memoriaTitleRef} className="flex flex-col items-center select-none pt-1 sm:pt-2 px-2 overflow-visible opacity-0">
             <h1
               style={{
                 fontFamily: 'var(--font-ballet), cursive',
@@ -278,62 +278,62 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
                 WebkitTextFillColor: 'transparent',
                 display: 'inline-block',
               }}
-              className="text-5xl xs:text-6xl sm:text-7xl md:text-8xl lg:text-[7.8rem] xl:text-[8.5rem] font-normal tracking-[0.05em] bg-gradient-to-b from-[#fffbf0] via-[#f5d890] to-[#cba358] drop-shadow-[0_4px_24px_rgba(214,180,106,0.65)] hover:scale-102 transition-transform duration-300 leading-[1.3] pt-1 sm:pt-3 pb-1 px-3 overflow-visible"
+              className="text-5xl xs:text-6xl sm:text-7xl md:text-8xl lg:text-[7.8rem] xl:text-[8.5rem] font-normal tracking-[0.04em] bg-gradient-to-b from-[#fffbf0] via-[#f5d890] to-[#cba358] drop-shadow-[0_4px_24px_rgba(214,180,106,0.65)] hover:scale-102 transition-transform duration-300 leading-[1.2] pb-1 px-3 overflow-visible"
             >
               Memoria
             </h1>
 
             {/* Signature Metallic Underline with Art Deco Diamond Accent */}
-            <div className="w-32 xs:w-40 sm:w-64 md:w-80 my-1 sm:my-2 relative flex items-center justify-center">
+            <div className="w-28 xs:w-36 sm:w-64 md:w-80 my-1 sm:my-2 relative flex items-center justify-center">
               <div className="w-full h-[1.5px] bg-gradient-to-r from-transparent via-[#f5d890] to-transparent opacity-85" />
               <div className="absolute w-2 h-2 sm:w-2.5 sm:h-2.5 rotate-45 bg-[#fef08a] border border-[#a16207] shadow-[0_0_8px_rgba(250,204,21,0.9)]" />
             </div>
           </div>
 
-          {/* EVENT INFORMATION: WAKTU & TEMPAT (Atas-Bawah di HP agar Jelas & Mudah Dibaca, Sampingan di Desktop) */}
+          {/* EVENT INFORMATION: WAKTU & TEMPAT (Atas-Bawah di HP agar Jelas & Rapi, Sampingan di Desktop) */}
           <div
             ref={eventInfoRef}
-            className="w-full max-w-[310px] xs:max-w-[340px] sm:max-w-2xl px-3.5 sm:px-6 py-2.5 sm:py-3.5 rounded-2xl bg-gradient-to-r from-[#2c090d]/85 via-[#3a0d13]/90 to-[#2c090d]/85 border border-[#d6b46a]/40 shadow-xl backdrop-blur-md opacity-0"
+            className="w-full max-w-[290px] xs:max-w-[325px] sm:max-w-2xl px-3.5 sm:px-6 py-2 sm:py-3.5 rounded-2xl bg-gradient-to-r from-[#2c090d]/85 via-[#3a0d13]/90 to-[#2c090d]/85 border border-[#d6b46a]/40 shadow-xl backdrop-blur-md opacity-0"
           >
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-4 divide-y sm:divide-y-0 sm:divide-x divide-[#d6b46a]/30">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4 divide-y sm:divide-y-0 sm:divide-x divide-[#d6b46a]/30">
               
               {/* SISI WAKTU (Atas di HP, Kiri di Desktop) */}
-              <div className="flex items-center gap-3 sm:justify-center sm:pr-4 flex-1">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#1c0406] border border-[#d6b46a]/50 flex items-center justify-center shrink-0 shadow-inner">
-                  <Clock size={16} weight="fill" className="text-[#f5d890]" />
+              <div className="flex items-center gap-2.5 sm:gap-3 sm:justify-center sm:pr-4 flex-1">
+                <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-[#1c0406] border border-[#d6b46a]/50 flex items-center justify-center shrink-0 shadow-inner">
+                  <Clock size={15} weight="fill" className="text-[#f5d890]" />
                 </div>
                 <div className="text-left min-w-0">
                   <span
                     style={{ fontFamily: 'var(--font-bodoni), Georgia, serif' }}
-                    className="block text-[8.5px] sm:text-[10px] tracking-[0.2em] uppercase text-[#d6b46a] font-semibold"
+                    className="block text-[8px] sm:text-[10px] tracking-[0.2em] uppercase text-[#d6b46a] font-semibold"
                   >
                     WAKTU
                   </span>
                   <span className="block text-xs sm:text-sm font-medium text-[#f5e9d3] leading-tight">
                     {formatWibDateOnly(event.eventStartAt)}
                   </span>
-                  <span className="block text-[10px] sm:text-[11px] font-mono text-[#f5d890]/85 leading-tight">
+                  <span className="block text-[9.5px] sm:text-[11px] font-mono text-[#f5d890]/85 leading-tight">
                     Pukul {formatWibTimeOnly(event.eventStartAt)}
                   </span>
                 </div>
               </div>
 
               {/* SISI TEMPAT (Bawah di HP, Kanan di Desktop) */}
-              <div className="flex items-center gap-3 sm:justify-center pt-2.5 sm:pt-0 sm:pl-4 flex-1">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#1c0406] border border-[#d6b46a]/50 flex items-center justify-center shrink-0 shadow-inner">
-                  <MapPin size={16} weight="fill" className="text-[#f5d890]" />
+              <div className="flex items-center gap-2.5 sm:gap-3 sm:justify-center pt-2 sm:pt-0 sm:pl-4 flex-1">
+                <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-[#1c0406] border border-[#d6b46a]/50 flex items-center justify-center shrink-0 shadow-inner">
+                  <MapPin size={15} weight="fill" className="text-[#f5d890]" />
                 </div>
                 <div className="text-left min-w-0">
                   <span
                     style={{ fontFamily: 'var(--font-bodoni), Georgia, serif' }}
-                    className="block text-[8.5px] sm:text-[10px] tracking-[0.2em] uppercase text-[#d6b46a] font-semibold"
+                    className="block text-[8px] sm:text-[10px] tracking-[0.2em] uppercase text-[#d6b46a] font-semibold"
                   >
                     TEMPAT
                   </span>
                   <span className="block text-xs sm:text-sm font-medium text-[#f5e9d3] leading-tight truncate">
                     {event.venueName}
                   </span>
-                  <span className="block text-[10px] sm:text-[11px] text-[#f5d890]/85 font-sans leading-tight">
+                  <span className="block text-[9.5px] sm:text-[11px] text-[#f5d890]/85 font-sans leading-tight">
                     Telkom University
                   </span>
                 </div>
@@ -343,8 +343,8 @@ export function TheatreStageHero({ event }: TheatreStageHeroProps) {
           </div>
 
           {/* MARQUEE COUNTDOWN TIMER (2x2 Grid di HP, 4 Kotak Horizontal di Desktop) */}
-          <div ref={countdownSectionRef} className="flex flex-col items-center gap-1.5 sm:gap-2 mt-1 sm:mt-2 w-full max-w-3xl opacity-0">
-            <div className="text-[8.5px] xs:text-[9.5px] sm:text-xs tracking-[0.22em] uppercase text-[#d6b46a]/90 font-semibold">
+          <div ref={countdownSectionRef} className="flex flex-col items-center gap-1 sm:gap-2 mt-0.5 sm:mt-1 w-full max-w-3xl opacity-0">
+            <div className="text-[8px] xs:text-[9px] sm:text-xs tracking-[0.22em] uppercase text-[#d6b46a]/90 font-semibold">
               {countdown.isPast ? 'Acara Telah Dimulai' : 'Menuju Malam Puncak'}
             </div>
             <TheatreCountdown countdown={countdown} />
