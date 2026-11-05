@@ -328,7 +328,7 @@ export async function saveLecturerInvitationAction(data: {
         .select('id')
         .eq('email', cleanEmail)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       if (duplicate) {
         return {
@@ -488,8 +488,9 @@ export async function enqueueLecturerEmailAction(lecturerId: string): Promise<{
     const { data: eventSettings } = await admin
       .from('event_settings')
       .select('event_name, event_start_at, venue_name, venue_address, invitation_template')
-      .eq('id', 1)
-      .single();
+      .order('id', { ascending: true })
+      .limit(1)
+      .maybeSingle();
 
     const siteUrl = getEffectiveSiteUrl();
     const inviteUrl = `${siteUrl}/undangan/${lecturer.public_token || lecturer.invitation_code}`;
@@ -497,17 +498,24 @@ export async function enqueueLecturerEmailAction(lecturerId: string): Promise<{
     const subject = (template.subject || 'Undangan Kehormatan MEMORIA Diesnatalis 2026')
       .replace('{{nama_dosen}}', lecturer.full_name);
 
+    const eventName = eventSettings?.event_name || 'MEMORIA';
+    const eventDate = eventSettings?.event_start_at
+      ? formatWibDateTime(eventSettings.event_start_at)
+      : 'Jumat, 6 November 2026';
+    const venueName = eventSettings?.venue_name || 'GSG (Gedung Serba Guna)';
+    const venueAddress = eventSettings?.venue_address || 'Telkom University Bandung';
+
     const html = buildLecturerInvitationEmailHtml({
       lecturerName: lecturer.full_name,
       title: '',
       invitationCode: lecturer.invitation_code,
       inviteUrl,
-      eventName: eventSettings?.event_name || 'MEMORIA',
-      eventDate: formatWibDateTime(eventSettings?.event_start_at),
-      venueName: eventSettings?.venue_name || 'GSG (Gedung Serba Guna)',
-      venueAddress: eventSettings?.venue_address || 'Telkom University Bandung',
+      eventName,
+      eventDate,
+      venueName,
+      venueAddress,
       greeting: template.greeting,
-      bodyParagraph: template.body_paragraph,
+      bodyParagraph: template.body || template.body_paragraph,
       qrToken: lecturer.qr_token,
     });
 

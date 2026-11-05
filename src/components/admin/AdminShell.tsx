@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCurrentStaffSession, logoutAction } from '@/app/actions/auth';
 import { InternalAccount } from '@/types';
@@ -31,47 +31,23 @@ interface AdminShellProps {
 export function AdminShell({ children, title, adminOnly = false }: AdminShellProps) {
   const router = useRouter();
 
-  // Deterministic state on SSR and initial hydration to avoid hydration mismatch
-  const [currentUser, setCurrentUser] = useState<InternalAccount | null>(() => {
-    if (typeof window !== 'undefined' && memoryStaffSession) return memoryStaffSession;
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = sessionStorage.getItem('memoria_staff_session');
-        if (stored) {
-          const parsed = JSON.parse(stored) as InternalAccount;
-          memoryStaffSession = parsed;
-          return parsed;
-        }
-      } catch {}
-    }
-    return null;
-  });
+  // Consistent initial state on both SSR and initial client hydration to prevent hydration mismatch
+  const [currentUser, setCurrentUser] = useState<InternalAccount | null>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [loading, setLoading] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      if (memoryStaffSession) return false;
-      try {
-        if (sessionStorage.getItem('memoria_staff_session')) return false;
-      } catch {}
-    }
-    return true;
-  });
 
   useEffect(() => {
     let active = true;
 
     // Fast-path from client session storage or memory cache
     try {
-      if (memoryStaffSession && !currentUser) {
+      if (memoryStaffSession) {
         setCurrentUser(memoryStaffSession);
-        setLoading(false);
-      } else if (!currentUser) {
+      } else {
         const stored = sessionStorage.getItem('memoria_staff_session');
         if (stored) {
           const parsed = JSON.parse(stored) as InternalAccount;
           memoryStaffSession = parsed;
           setCurrentUser(parsed);
-          setLoading(false);
         }
       }
     } catch {}
@@ -91,7 +67,6 @@ export function AdminShell({ children, title, adminOnly = false }: AdminShellPro
       } catch {}
 
       setCurrentUser(user);
-      setLoading(false);
     });
 
     return () => {
@@ -105,17 +80,8 @@ export function AdminShell({ children, title, adminOnly = false }: AdminShellPro
     window.location.href = '/panitia/login';
   };
 
-  // Only show full-screen verification on the very first cold load when no cache exists
-  if (loading || !currentUser) {
-    return (
-      <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center text-xs text-neutral-400 font-sans">
-        Memverifikasi sesi panitia...
-      </div>
-    );
-  }
-
   // Role guard: staff trying to open admin-only routes
-  const isStaff = currentUser.role === 'PETUGAS_CHECKIN';
+  const isStaff = currentUser?.role === 'PETUGAS_CHECKIN';
   if (adminOnly && isStaff) {
     return (
       <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center p-4 font-sans">
@@ -144,7 +110,9 @@ export function AdminShell({ children, title, adminOnly = false }: AdminShellPro
       <div className="h-screen w-full overflow-hidden bg-[#F8F9FB] text-[#252932] flex font-sans">
         {/* Desktop Sidebar (Fixed on the left, does not scroll with page content) */}
         <aside className="hidden md:flex w-64 shrink-0 h-full flex-col z-20">
-          <AdminSidebar user={currentUser} onLogout={handleLogout} />
+          <Suspense fallback={<div className="w-64 bg-white border-r border-[#E5E7EB] h-full" />}>
+            <AdminSidebar user={currentUser} onLogout={handleLogout} />
+          </Suspense>
         </aside>
 
         {/* Mobile Sidebar Overlay Drawer */}
@@ -155,11 +123,13 @@ export function AdminShell({ children, title, adminOnly = false }: AdminShellPro
               onClick={() => setMobileDrawerOpen(false)}
             />
             <div className="relative w-64 max-w-[80vw] h-full bg-white shadow-2xl z-10 flex flex-col">
-              <AdminSidebar
-                user={currentUser}
-                onLogout={handleLogout}
-                onCloseMobile={() => setMobileDrawerOpen(false)}
-              />
+              <Suspense fallback={null}>
+                <AdminSidebar
+                  user={currentUser}
+                  onLogout={handleLogout}
+                  onCloseMobile={() => setMobileDrawerOpen(false)}
+                />
+              </Suspense>
             </div>
           </div>
         )}

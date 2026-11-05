@@ -7,6 +7,121 @@ interface ResolveRequestBody {
   qrToken?: string;
   manualType?: 'MAHASISWA' | 'DOSEN' | 'TOKEN';
   manualQuery?: string;
+  autoConfirm?: boolean;
+  method?: string;
+}
+
+/**
+ * Helper untuk menangani auto-confirm (1-step langsung pada pemindaian kamera QR)
+ * atau fallback ke 2-step HMAC resolution token untuk pencarian manual.
+ */
+async function handleAutoConfirmOrResolution({
+  supabase,
+  staff,
+  autoConfirm,
+  method,
+  targetType,
+  targetId,
+  attendeeBase,
+  existingCheckin,
+}: {
+  supabase: any;
+  staff: { id: string; fullName: string };
+  autoConfirm?: boolean;
+  method?: string;
+  targetType: 'PARTICIPANT' | 'LECTURER';
+  targetId: string;
+  attendeeBase: any;
+  existingCheckin: any;
+}) {
+  const isCheckedIn = !!existingCheckin;
+
+  if (autoConfirm) {
+    if (isCheckedIn) {
+      return NextResponse.json({
+        success: true,
+        outcome: 'ALREADY_CHECKED_IN',
+        attendee: {
+          ...attendeeBase,
+          isCheckedIn: true,
+          firstCheckedInAt: existingCheckin?.checked_at || new Date().toISOString(),
+          checkedAt: existingCheckin?.checked_at || new Date().toISOString(),
+          operatorName: (existingCheckin?.staff_profiles as any)?.name || 'Petugas Check-in',
+          checkinMethod: existingCheckin?.method || null,
+          canCheckIn: false,
+        },
+      });
+    }
+
+    const normalizedMethod = (method || 'qr').toLowerCase().includes('qr') ? 'qr' : 'manual';
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('confirm_checkin', {
+      p_target_type: targetType,
+      p_target_id: targetId,
+      p_method: normalizedMethod,
+      p_staff_id: staff.id,
+    });
+
+    if (rpcError || !rpcResult?.success) {
+      console.error('[checkins/resolve] RPC Error:', rpcError || rpcResult);
+      return NextResponse.json(
+        {
+          success: false,
+          error: rpcResult?.error || 'CHECKIN_REJECTED',
+          message: rpcResult?.message || rpcError?.message || 'Presensi ditolak oleh sistem.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Insert audit log asynchronously (non-blocking untuk respons ultra-cepat)
+    supabase
+      .from('audit_logs')
+      .insert({
+        actor_id: staff.id,
+        action: rpcResult.outcome === 'CREATED' ? 'CHECKIN_CONFIRM_SUCCESS' : 'CHECKIN_ALREADY_RECORDED',
+        entity_type: targetType === 'PARTICIPANT' ? 'participants' : 'lecturer_invitations',
+        entity_id: targetId,
+        details: {
+          outcome: rpcResult.outcome,
+          method: normalizedMethod,
+          operatorName: staff.fullName,
+        },
+      })
+      .then(() => {})
+      .catch((err: any) => console.error('[checkins/resolve] Audit log error:', err));
+
+    return NextResponse.json({
+      success: true,
+      outcome: rpcResult.outcome,
+      attendee: {
+        ...attendeeBase,
+        isCheckedIn: true,
+        firstCheckedInAt: rpcResult.checked_at || new Date().toISOString(),
+        checkedAt: rpcResult.checked_at || new Date().toISOString(),
+        operatorName: staff.fullName || 'Petugas Check-in',
+        checkinMethod: normalizedMethod,
+        canCheckIn: false,
+      },
+    });
+  }
+
+  // Standar 2-step resolution (Manual Search mode)
+  const resolutionToken = isCheckedIn
+    ? ''
+    : signResolutionToken(targetType, targetId, staff.id);
+
+  return NextResponse.json({
+    success: true,
+    resolutionToken,
+    attendee: {
+      ...attendeeBase,
+      isCheckedIn,
+      firstCheckedInAt: existingCheckin?.checked_at || null,
+      operatorName: (existingCheckin?.staff_profiles as any)?.name || 'Petugas Check-in',
+      checkinMethod: existingCheckin?.method || null,
+      canCheckIn: !isCheckedIn,
+    },
+  });
 }
 
 /**
@@ -128,15 +243,15 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const isCheckedIn = !!existingCheckin;
-        const resolutionToken = isCheckedIn
-          ? ''
-          : signResolutionToken('PARTICIPANT', participant.id, staff.id);
-
-        return NextResponse.json({
-          success: true,
-          resolutionToken,
-          attendee: {
+        return handleAutoConfirmOrResolution({
+          supabase,
+          staff,
+          autoConfirm: body.autoConfirm,
+          method: body.method,
+          targetType: 'PARTICIPANT',
+          targetId: participant.id,
+          existingCheckin,
+          attendeeBase: {
             targetType: 'PARTICIPANT' as const,
             id: participant.id,
             name: participant.full_name,
@@ -144,11 +259,6 @@ export async function POST(req: NextRequest) {
             identifierMasked: maskIdentifier(participant.nim, false),
             subtext: `${participant.study_program} — ${participant.faculty}`,
             ticketName: ticketType?.name || 'Tiket Regular',
-            isCheckedIn,
-            firstCheckedInAt: existingCheckin?.checked_at || null,
-            operatorName: (existingCheckin?.staff_profiles as any)?.name || 'Petugas Check-in',
-            checkinMethod: existingCheckin?.method || null,
-            canCheckIn: !isCheckedIn,
           },
         });
       }
@@ -202,15 +312,15 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const isCheckedIn = !!existingCheckin;
-        const resolutionToken = isCheckedIn
-          ? ''
-          : signResolutionToken('LECTURER', lecturer.id, staff.id);
-
-        return NextResponse.json({
-          success: true,
-          resolutionToken,
-          attendee: {
+        return handleAutoConfirmOrResolution({
+          supabase,
+          staff,
+          autoConfirm: body.autoConfirm,
+          method: body.method,
+          targetType: 'LECTURER',
+          targetId: lecturer.id,
+          existingCheckin,
+          attendeeBase: {
             targetType: 'LECTURER' as const,
             id: lecturer.id,
             name: lecturer.full_name,
@@ -218,11 +328,6 @@ export async function POST(req: NextRequest) {
             identifierMasked: lecturer.email ? maskIdentifier(lecturer.email, true) : lecturer.invitation_code,
             subtext: `Tamu VIP Dosen • ${lecturer.invitation_code}`,
             ticketName: 'Undangan Dosen Kehormatan',
-            isCheckedIn,
-            firstCheckedInAt: existingCheckin?.checked_at || null,
-            operatorName: (existingCheckin?.staff_profiles as any)?.name || 'Petugas Check-in',
-            checkinMethod: existingCheckin?.method || null,
-            canCheckIn: !isCheckedIn,
           },
         });
       }
@@ -255,15 +360,15 @@ export async function POST(req: NextRequest) {
           .eq('participant_id', partByToken.id)
           .maybeSingle();
 
-        const isCheckedIn = !!existingCheckin;
-        const resolutionToken = isCheckedIn
-          ? ''
-          : signResolutionToken('PARTICIPANT', partByToken.id, staff.id);
-
-        return NextResponse.json({
-          success: true,
-          resolutionToken,
-          attendee: {
+        return handleAutoConfirmOrResolution({
+          supabase,
+          staff,
+          autoConfirm: body.autoConfirm,
+          method: body.method,
+          targetType: 'PARTICIPANT',
+          targetId: partByToken.id,
+          existingCheckin,
+          attendeeBase: {
             targetType: 'PARTICIPANT' as const,
             id: partByToken.id,
             name: partByToken.full_name,
@@ -271,11 +376,6 @@ export async function POST(req: NextRequest) {
             identifierMasked: maskIdentifier(partByToken.nim, false),
             subtext: `${partByToken.study_program} — ${partByToken.faculty}`,
             ticketName: (partByToken.ticket_types as any)?.name || 'Tiket Regular',
-            isCheckedIn,
-            firstCheckedInAt: existingCheckin?.checked_at || null,
-            operatorName: (existingCheckin?.staff_profiles as any)?.name || 'Petugas Check-in',
-            checkinMethod: existingCheckin?.method || null,
-            canCheckIn: !isCheckedIn,
           },
         });
       }
@@ -305,15 +405,15 @@ export async function POST(req: NextRequest) {
           .eq('lecturer_id', lecByToken.id)
           .maybeSingle();
 
-        const isCheckedIn = !!existingCheckin;
-        const resolutionToken = isCheckedIn
-          ? ''
-          : signResolutionToken('LECTURER', lecByToken.id, staff.id);
-
-        return NextResponse.json({
-          success: true,
-          resolutionToken,
-          attendee: {
+        return handleAutoConfirmOrResolution({
+          supabase,
+          staff,
+          autoConfirm: body.autoConfirm,
+          method: body.method,
+          targetType: 'LECTURER',
+          targetId: lecByToken.id,
+          existingCheckin,
+          attendeeBase: {
             targetType: 'LECTURER' as const,
             id: lecByToken.id,
             name: lecByToken.full_name,
@@ -321,11 +421,6 @@ export async function POST(req: NextRequest) {
             identifierMasked: lecByToken.email ? maskIdentifier(lecByToken.email, true) : lecByToken.invitation_code,
             subtext: `Tamu VIP Dosen • ${lecByToken.invitation_code}`,
             ticketName: 'Undangan Dosen Kehormatan',
-            isCheckedIn,
-            firstCheckedInAt: existingCheckin?.checked_at || null,
-            operatorName: (existingCheckin?.staff_profiles as any)?.name || 'Petugas Check-in',
-            checkinMethod: existingCheckin?.method || null,
-            canCheckIn: !isCheckedIn,
           },
         });
       }
@@ -413,15 +508,15 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const isCheckedIn = !!existingCheckin;
-      const resolutionToken = isCheckedIn
-        ? ''
-        : signResolutionToken('PARTICIPANT', participant.id, staff.id);
-
-      return NextResponse.json({
-        success: true,
-        resolutionToken,
-        attendee: {
+      return handleAutoConfirmOrResolution({
+        supabase,
+        staff,
+        autoConfirm: body.autoConfirm,
+        method: body.method,
+        targetType: 'PARTICIPANT',
+        targetId: participant.id,
+        existingCheckin,
+        attendeeBase: {
           targetType: 'PARTICIPANT' as const,
           id: participant.id,
           name: participant.full_name,
@@ -429,11 +524,6 @@ export async function POST(req: NextRequest) {
           identifierMasked: maskIdentifier(participant.nim, false),
           subtext: `${participant.study_program} — ${participant.faculty}`,
           ticketName: ticketType?.name || 'Tiket Regular',
-          isCheckedIn,
-          firstCheckedInAt: existingCheckin?.checked_at || null,
-          operatorName: (existingCheckin?.staff_profiles as any)?.name || 'Petugas Check-in',
-          checkinMethod: existingCheckin?.method || null,
-          canCheckIn: !isCheckedIn,
         },
       });
     }
@@ -511,15 +601,15 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const isCheckedIn = !!existingCheckin;
-      const resolutionToken = isCheckedIn
-        ? ''
-        : signResolutionToken('LECTURER', lecturer.id, staff.id);
-
-      return NextResponse.json({
-        success: true,
-        resolutionToken,
-        attendee: {
+      return handleAutoConfirmOrResolution({
+        supabase,
+        staff,
+        autoConfirm: body.autoConfirm,
+        method: body.method,
+        targetType: 'LECTURER',
+        targetId: lecturer.id,
+        existingCheckin,
+        attendeeBase: {
           targetType: 'LECTURER' as const,
           id: lecturer.id,
           name: lecturer.full_name,
@@ -527,11 +617,6 @@ export async function POST(req: NextRequest) {
           identifierMasked: lecturer.email ? maskIdentifier(lecturer.email, true) : lecturer.invitation_code,
           subtext: `Tamu VIP Dosen • ${lecturer.invitation_code}`,
           ticketName: 'Undangan Dosen Kehormatan',
-          isCheckedIn,
-          firstCheckedInAt: existingCheckin?.checked_at || null,
-          operatorName: (existingCheckin?.staff_profiles as any)?.name || 'Petugas Check-in',
-          checkinMethod: existingCheckin?.method || null,
-          canCheckIn: !isCheckedIn,
         },
       });
     }

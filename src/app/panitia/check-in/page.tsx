@@ -122,7 +122,7 @@ export default function CheckinPage() {
     };
   }, [loadHistoryData]);
 
-  // 1. Resolve QR token from Camera / Direct Scan
+  // 1. Resolve QR token from Camera / Direct Scan (Atomic 1-Step Instant Check-in)
   const handleLookupQr = async (token: string) => {
     const trimmed = token.trim();
     if (!trimmed) return;
@@ -135,7 +135,7 @@ export default function CheckinPage() {
       const res = await fetch('/api/checkins/resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qrToken: trimmed }),
+        body: JSON.stringify({ qrToken: trimmed, autoConfirm: true, method: 'CAMERA_QR' }),
       });
 
       const data = await res.json();
@@ -144,12 +144,12 @@ export default function CheckinPage() {
         return;
       }
 
-      // Jika peserta sudah pernah check-in sebelumnya, langsung tampilkan modal popup peringatan di tengah
-      if (data.attendee.isCheckedIn) {
+      // Kasus 1: Sudah pernah check-in sebelumnya -> Tampilkan popup peringatan langsung
+      if (data.outcome === 'ALREADY_CHECKED_IN' || data.attendee?.isCheckedIn) {
         setAlreadyCheckedModal({
           name: data.attendee.name,
           ticketName: data.attendee.ticketName,
-          checkedAt: data.attendee.firstCheckedInAt || new Date().toISOString(),
+          checkedAt: data.attendee.firstCheckedInAt || data.attendee.checkedAt || new Date().toISOString(),
           operatorName: data.attendee.operatorName || 'Panitia MEMORIA',
           targetType: data.attendee.targetType,
         });
@@ -157,8 +157,23 @@ export default function CheckinPage() {
         return;
       }
 
-      // Otomatis langsung catat kehadiran jika tiket sah dan belum check-in
-      if (!data.attendee.isCheckedIn && data.resolutionToken) {
+      // Kasus 2: Berhasil check-in baru secara instan dalam 1 roundtrip
+      if (data.outcome === 'CREATED') {
+        setSuccessModal({
+          name: data.attendee.name,
+          ticketName: data.attendee.ticketName,
+          checkedAt: data.attendee.checkedAt || new Date().toISOString(),
+          operatorName: data.attendee.operatorName || 'Petugas Check-in',
+          targetType: data.attendee.targetType,
+        });
+        setScanResult(null);
+        // Refresh live counter & riwayat di background secara non-blocking
+        loadHistoryData().catch(console.error);
+        return;
+      }
+
+      // Fallback 2-step jika autoConfirm tidak aktif
+      if (data.resolutionToken) {
         await handleConfirmCheckin(data.resolutionToken, 'CAMERA_QR', data.attendee);
       }
     } catch (err: any) {

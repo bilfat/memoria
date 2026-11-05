@@ -290,7 +290,8 @@ export function buildLecturerInvitationEmailHtml(params: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
   <title>Undangan Kehormatan MEMORIA 2026</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #0c0204; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #FFFFFF;">
@@ -373,6 +374,78 @@ export function buildLecturerInvitationEmailHtml(params: {
   </table>
 </body>
 </html>`;
+}
+
+/**
+ * Mengirimkan e-ticket langsung ke email mahasiswa secara instan saat pendaftaran.
+ * Dilengkapi dengan lampiran PDF resmi dan barcode/QR.
+ */
+export async function sendTicketEmailDirect(
+  participantId: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const admin = createAdminClient();
+    const { data: participant } = await admin
+      .from('participants')
+      .select('id, full_name, email, ticket_number, ticket_access_token')
+      .eq('id', participantId)
+      .single();
+
+    if (!participant || !participant.email || !participant.email.includes('@')) {
+      return { success: false, error: 'Peserta atau email tidak valid.' };
+    }
+
+    const ticketData = await fetchTicketByAccessToken(participant.ticket_access_token);
+    if (!ticketData) {
+      return { success: false, error: 'Data tiket tidak dapat dimuat dari database.' };
+    }
+
+    const pdfBuffer = await generateTicketPdfBuffer(ticketData);
+    const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
+    const pdfFilename = `MEMORIA-Ticket-${ticketData.nim}-${ticketData.ticketNumber}.pdf`;
+    const siteUrl = getEffectiveSiteUrl();
+    const html = buildTicketEmailHtml(ticketData, siteUrl);
+    const subject = `🎟️ E-Ticket Resmi: ${ticketData.eventName} (${ticketData.ticketNumber})`;
+
+    const sendResult = await sendBrevoTransactionalEmail({
+      to: [{ email: participant.email, name: ticketData.fullName }],
+      subject,
+      htmlContent: html,
+      attachment: [
+        {
+          name: pdfFilename,
+          content: pdfBase64,
+        },
+      ],
+    });
+
+    if (sendResult.success) {
+      await admin
+        .from('email_jobs')
+        .update({
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          provider_message_id: sendResult.messageId || null,
+          last_error_code: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('participant_id', participantId);
+    } else {
+      await admin
+        .from('email_jobs')
+        .update({
+          status: 'failed',
+          last_error_code: (sendResult.error || 'SEND_FAILED').substring(0, 100),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('participant_id', participantId);
+    }
+
+    return sendResult;
+  } catch (err: any) {
+    console.error('[sendTicketEmailDirect] Exception:', err);
+    return { success: false, error: err.message || 'Gagal mengirim email tiket.' };
+  }
 }
 
 /**

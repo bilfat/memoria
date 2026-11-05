@@ -212,7 +212,12 @@ export function CameraQrScanner({ onScan, isProcessing = false }: CameraQrScanne
           });
 
           const now = Date.now();
-          if (code && code.data && now - lastScanTimeRef.current > 2000) {
+          const isSameCode = code && code.data && code.data === lastScannedCode;
+          // Cooldown 2.5s jika kode persis sama (menghindari duplikasi scan kamera yang menahan tiket),
+          // tetapi hanya 750ms jika kode berbeda untuk antrean cepat tamu berikutnya!
+          const cooldown = isSameCode ? 2500 : 750;
+
+          if (code && code.data && now - lastScanTimeRef.current > cooldown) {
             lastScanTimeRef.current = now;
             setLastScannedCode(code.data);
             setScanFlash(true);
@@ -220,7 +225,7 @@ export function CameraQrScanner({ onScan, isProcessing = false }: CameraQrScanne
             // Bunyikan Audio Beep scanner kasir instan pada milidetik QR terbaca
             playBeepSound();
 
-            setTimeout(() => setScanFlash(false), 400);
+            setTimeout(() => setScanFlash(false), 300);
 
             // Teruskan token hasil scan ke parent handler
             onScan(code.data);

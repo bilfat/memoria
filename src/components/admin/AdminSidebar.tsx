@@ -37,7 +37,7 @@ interface NavItem {
 
 export function AdminSidebar({ user, onLogout, onCloseMobile }: AdminSidebarProps) {
   const pathname = usePathname();
-  const isAdmin = user?.role === 'ADMIN_PANITIA';
+  const isAdmin = user ? user.role === 'ADMIN_PANITIA' : true;
 
   // Sesuai Master Spec Phase A
   const adminNav: NavItem[] = [

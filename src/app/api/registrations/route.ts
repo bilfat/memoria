@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { participantRegistrationSchema } from '@/lib/validations';
-import { processEmailJobsBatch } from '@/lib/brevo';
+import { processEmailJobsBatch, sendTicketEmailDirect } from '@/lib/brevo';
 
 export async function POST(request: NextRequest) {
   try {
@@ -97,10 +97,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Kirim email tiket secara instan di background worker
-    processEmailJobsBatch().catch((err) => {
-      console.error('[API Registrations] Trigger email jobs error:', err);
-    });
+    // 5. Langsung kirim tiket ke email peserta secara otomatis via Brevo
+    try {
+      await Promise.race([
+        sendTicketEmailDirect(rpcResult.participantId),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Email send timeout')), 2500)),
+      ]);
+    } catch (err) {
+      console.warn('[API Registrations] Direct email non-blocking fallback:', err);
+      processEmailJobsBatch().catch(console.error);
+    }
 
     // 6. Sukses
     const ticketUrl = `/tiket/${rpcResult.ticketAccessToken}`;
