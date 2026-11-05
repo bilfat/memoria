@@ -325,61 +325,61 @@ export default function CheckinPage() {
 
   return (
     <AdminShell title="Meja Registrasi & Check-in Presensi">
-      <div className="space-y-6">
+      <div className="space-y-6 w-full max-w-full min-w-0">
         {/* KPI Counter Header (Live from DB) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-xs">
-            <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full min-w-0">
+          <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-xs min-w-0">
+            <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider block truncate">
               Total Hadir di Venue
             </span>
             <div className="text-2xl font-extrabold text-neutral-900 mt-1">{stats.totalCount}</div>
-            <p className="text-[11px] text-neutral-400 mt-0.5">Seluruh kategori kehadiran</p>
+            <p className="text-[11px] text-neutral-400 mt-0.5 truncate">Seluruh kategori kehadiran</p>
           </div>
-          <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-xs">
-            <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
+          <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-xs min-w-0">
+            <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider block truncate">
               Mahasiswa Hadir
             </span>
             <div className="text-2xl font-extrabold text-emerald-600 mt-1">{stats.studentCount}</div>
-            <p className="text-[11px] text-neutral-400 mt-0.5">Peserta tiket reguler / VIP</p>
+            <p className="text-[11px] text-neutral-400 mt-0.5 truncate">Peserta tiket reguler / VIP</p>
           </div>
-          <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-xs">
-            <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
+          <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-xs min-w-0">
+            <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider block truncate">
               Dosen & Tamu Kehormatan
             </span>
             <div className="text-2xl font-extrabold text-amber-600 mt-1">{stats.lecturerCount}</div>
-            <p className="text-[11px] text-neutral-400 mt-0.5">Undangan khusus dosen</p>
+            <p className="text-[11px] text-neutral-400 mt-0.5 truncate">Undangan khusus dosen</p>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-2 border-b border-neutral-200">
+        {/* Tab Navigation - Overflow-x-auto & shrink-0 strictly prevent page horizontal scroll */}
+        <div className="flex items-center gap-1.5 sm:gap-2 border-b border-neutral-200 overflow-x-auto scrollbar-none pb-px w-full max-w-full">
           <button
             onClick={() => setActiveTab('SCAN')}
-            className={`inline-flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            className={`inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === 'SCAN'
                 ? 'border-neutral-900 text-neutral-900'
                 : 'border-transparent text-neutral-500 hover:text-neutral-800'
             }`}
           >
             <QrCode size={16} />
-            Scan QR Code Kamera
+            Scan QR Kamera
           </button>
 
           <button
             onClick={() => setActiveTab('MANUAL')}
-            className={`inline-flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            className={`inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === 'MANUAL'
                 ? 'border-neutral-900 text-neutral-900'
                 : 'border-transparent text-neutral-500 hover:text-neutral-800'
             }`}
           >
             <MagnifyingGlass size={16} />
-            Pencarian Manual (NIM / Email / Kode)
+            Pencarian Manual
           </button>
 
           <button
             onClick={() => setActiveTab('HISTORY')}
-            className={`inline-flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            className={`inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === 'HISTORY'
                 ? 'border-neutral-900 text-neutral-900'
                 : 'border-transparent text-neutral-500 hover:text-neutral-800'
@@ -392,8 +392,8 @@ export default function CheckinPage() {
 
         {/* TAB 1: SCAN QR KAMERA */}
         {activeTab === 'SCAN' && (
-          <div className="max-w-2xl mx-auto space-y-4">
-            <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4 shadow-sm text-center">
+          <div className="max-w-2xl mx-auto space-y-4 w-full min-w-0">
+            <div className="bg-white rounded-2xl border border-neutral-200 p-4 sm:p-6 space-y-4 shadow-sm text-center w-full min-w-0">
               <div>
                 <h3 className="text-sm font-bold text-neutral-900 inline-flex items-center gap-2">
                   <QrCode size={18} className="text-emerald-600" />
@@ -423,8 +423,8 @@ export default function CheckinPage() {
 
         {/* TAB 2: PENCARIAN MANUAL */}
         {activeTab === 'MANUAL' && (
-          <div className="space-y-6">
-            <div className="max-w-2xl bg-white rounded-xl border border-neutral-200 p-6 space-y-4 shadow-sm">
+          <div className="space-y-6 w-full min-w-0">
+            <div className="max-w-2xl bg-white rounded-xl border border-neutral-200 p-4 sm:p-6 space-y-4 shadow-sm w-full min-w-0">
               <div>
                 <h3 className="text-sm font-bold text-neutral-900">Pencarian & Presensi Manual</h3>
                 <p className="text-xs text-neutral-500 mt-0.5">
@@ -482,7 +482,7 @@ export default function CheckinPage() {
                 </label>
               </div>
 
-              <form onSubmit={handleManualSearch} className="flex gap-2">
+              <form onSubmit={handleManualSearch} className="flex flex-col sm:flex-row gap-2 w-full min-w-0">
                 <input
                   type="text"
                   value={manualQuery}
@@ -491,15 +491,15 @@ export default function CheckinPage() {
                     manualType === 'MAHASISWA'
                       ? 'Masukkan NIM Mahasiswa resmi...'
                       : manualType === 'DOSEN'
-                      ? 'Masukkan Email atau Kode Dosen (contoh: DOS-26-0001)...'
+                      ? 'Masukkan Email atau Kode Dosen...'
                       : 'Masukkan token QR tiket...'
                   }
-                  className="flex-1 px-3.5 py-2.5 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                  className="flex-1 min-w-0 px-3.5 py-2.5 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900"
                 />
                 <button
                   type="submit"
                   disabled={loading || !manualQuery.trim()}
-                  className="px-5 py-2.5 bg-neutral-900 text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 disabled:opacity-50 cursor-pointer"
+                  className="px-5 py-2.5 bg-neutral-900 text-white text-xs font-semibold rounded-lg hover:bg-neutral-800 disabled:opacity-50 cursor-pointer shrink-0"
                 >
                   {loading ? 'Mencari...' : 'Cari Data'}
                 </button>
@@ -599,9 +599,9 @@ export default function CheckinPage() {
 
         {/* TAB 3: RIWAYAT CHECK-IN */}
         {activeTab === 'HISTORY' && (
-          <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm space-y-4 p-4">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="relative w-full sm:w-80">
+          <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm space-y-4 p-4 w-full min-w-0">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full min-w-0">
+              <div className="relative w-full sm:w-80 min-w-0">
                 <MagnifyingGlass
                   size={15}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
@@ -615,11 +615,11 @@ export default function CheckinPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                 <button
                   type="button"
                   onClick={loadHistoryData}
-                  className="p-1.5 rounded-lg border border-neutral-300 text-neutral-600 hover:bg-neutral-50 cursor-pointer"
+                  className="p-1.5 rounded-lg border border-neutral-300 text-neutral-600 hover:bg-neutral-50 cursor-pointer shrink-0"
                   title="Perbarui data"
                 >
                   <ArrowsClockwise size={15} />
@@ -627,7 +627,7 @@ export default function CheckinPage() {
                 <select
                   value={historyFilter}
                   onChange={(e) => setHistoryFilter(e.target.value as any)}
-                  className="px-3 py-1.5 text-xs rounded-lg border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-900 cursor-pointer"
+                  className="px-3 py-1.5 text-xs rounded-lg border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-900 cursor-pointer flex-1 sm:flex-initial"
                 >
                   <option value="ALL">Semua Kategori ({records.length})</option>
                   <option value="MAHASISWA">Mahasiswa ({stats.studentCount})</option>
@@ -641,8 +641,8 @@ export default function CheckinPage() {
                 Belum ada data check-in yang sesuai filter.
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto w-full max-w-full">
+                <table className="w-full text-left text-xs whitespace-nowrap">
                   <thead className="bg-neutral-50 text-neutral-600 border-b border-neutral-200">
                     <tr>
                       <th className="px-4 py-3 font-semibold">Waktu Presensi (WIB)</th>

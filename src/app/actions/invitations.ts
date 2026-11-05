@@ -251,7 +251,13 @@ export async function saveLecturerInvitationAction(data: {
   fullName: string;
   email: string;
   phone: string;
-}): Promise<{ success: boolean; error?: string; lecturerId?: string }> {
+}): Promise<{
+  success: boolean;
+  error?: string;
+  lecturerId?: string;
+  emailSent?: boolean;
+  emailError?: string;
+}> {
   try {
     const session = await getCurrentStaffSession();
     if (!session || session.role !== 'ADMIN_PANITIA') {
@@ -373,8 +379,22 @@ export async function saveLecturerInvitationAction(data: {
         details: { fullName: cleanName, email: cleanEmail, invitationCode },
       });
 
+      // Otomatis kirim surat undangan resmi & tiket QR ke email dosen langsung
+      let emailSent = false;
+      let emailError: string | undefined;
+      try {
+        const emailRes = await sendLecturerInvitationEmailDirect(inserted.id, admin, session.id);
+        emailSent = emailRes.success;
+        if (!emailRes.success) {
+          emailError = emailRes.error;
+        }
+      } catch (err: any) {
+        console.error('[saveLecturerInvitationAction] Auto send email error:', err);
+        emailError = err.message;
+      }
+
       revalidatePath('/panitia/undangan/dosen');
-      return { success: true, lecturerId: inserted.id };
+      return { success: true, lecturerId: inserted.id, emailSent, emailError };
     }
   } catch (err: any) {
     return { success: false, error: err.message || 'Terjadi kesalahan sistem.' };
@@ -454,20 +474,15 @@ export async function toggleLecturerActiveAction(id: string): Promise<{
 }
 
 /**
- * Mengirimkan email surat undangan resmi dosen secara langsung via Brevo
+ * Fungsi core untuk mengirimkan email surat undangan resmi dosen secara langsung via Brevo
  */
-export async function enqueueLecturerEmailAction(lecturerId: string): Promise<{
-  success: boolean;
-  message?: string;
-  error?: string;
-}> {
+export async function sendLecturerInvitationEmailDirect(
+  lecturerId: string,
+  adminClient?: any,
+  actorStaffId?: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    const session = await getCurrentStaffSession();
-    if (!session || session.role !== 'ADMIN_PANITIA') {
-      return { success: false, error: 'Akses ditolak.' };
-    }
-
-    const admin = createAdminClient();
+    const admin = adminClient || createAdminClient();
 
     // 1. Ambil data dosen
     const { data: lecturer, error: lecError } = await admin
@@ -539,7 +554,7 @@ export async function enqueueLecturerEmailAction(lecturerId: string): Promise<{
       attachment,
     });
 
-    // 4. Catat ke email_jobs
+    // 5. Catat ke email_jobs
     const dedupeKey = `lecturer_invitation_${lecturer.id}_${Date.now()}`;
     await admin.from('email_jobs').insert({
       kind: 'lecturer_invitation',
@@ -553,20 +568,22 @@ export async function enqueueLecturerEmailAction(lecturerId: string): Promise<{
       run_after: new Date().toISOString(),
     });
 
-    // 5. Catat ke audit_logs
-    await admin.from('audit_logs').insert({
-      actor_id: session.id,
-      action: 'DIRECT_LECTURER_EMAIL',
-      entity_type: 'email_jobs',
-      entity_id: lecturer.id,
-      details: {
-        email: lecturer.email,
-        code: lecturer.invitation_code,
-        success: sendResult.success,
-        messageId: sendResult.messageId,
-        error: sendResult.error,
-      },
-    });
+    // 6. Catat ke audit_logs jika ada session actor
+    if (actorStaffId) {
+      await admin.from('audit_logs').insert({
+        actor_id: actorStaffId,
+        action: 'DIRECT_LECTURER_EMAIL',
+        entity_type: 'email_jobs',
+        entity_id: lecturer.id,
+        details: {
+          email: lecturer.email,
+          code: lecturer.invitation_code,
+          success: sendResult.success,
+          messageId: sendResult.messageId,
+          error: sendResult.error,
+        },
+      });
+    }
 
     if (!sendResult.success) {
       return {
@@ -579,6 +596,28 @@ export async function enqueueLecturerEmailAction(lecturerId: string): Promise<{
       success: true,
       message: `Surat undangan resmi berhasil dikirim langsung ke ${lecturer.email}!`,
     };
+  } catch (err: any) {
+    console.error('[sendLecturerInvitationEmailDirect] Exception:', err);
+    return { success: false, error: err.message || 'Terjadi kesalahan sistem.' };
+  }
+}
+
+/**
+ * Server Action: Mengirimkan email surat undangan resmi dosen secara langsung via Brevo
+ */
+export async function enqueueLecturerEmailAction(lecturerId: string): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  try {
+    const session = await getCurrentStaffSession();
+    if (!session || session.role !== 'ADMIN_PANITIA') {
+      return { success: false, error: 'Akses ditolak.' };
+    }
+
+    const admin = createAdminClient();
+    return await sendLecturerInvitationEmailDirect(lecturerId, admin, session.id);
   } catch (err: any) {
     console.error('[enqueueLecturerEmailAction] Exception:', err);
     return { success: false, error: err.message || 'Terjadi kesalahan sistem.' };

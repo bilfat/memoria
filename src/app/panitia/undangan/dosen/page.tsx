@@ -152,10 +152,21 @@ export default function LecturerInvitationsPage() {
       });
 
       if (res.success) {
-        success(
-          editingId ? 'Data Dosen Diperbarui' : 'Undangan Dosen Dibuat',
-          `Undangan untuk ${formName} berhasil disimpan.`
-        );
+        if (editingId) {
+          success('Data Dosen Diperbarui', `Undangan untuk ${formName} berhasil diperbarui.`);
+        } else if (res.emailSent) {
+          success(
+            'Undangan Dibuat & Email Terkirim',
+            `Undangan untuk ${formName} berhasil disimpan dan surat resmi langsung dikirimkan ke ${formEmail}.`
+          );
+        } else {
+          success(
+            'Undangan Dosen Dibuat',
+            `Undangan untuk ${formName} berhasil disimpan.${
+              res.emailError ? ` (Catatan: Pengiriman email gagal: ${res.emailError})` : ''
+            }`
+          );
+        }
         setModalOpen(false);
         loadData();
       } else {
@@ -497,7 +508,7 @@ export default function LecturerInvitationsPage() {
                     className="w-full px-3.5 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
                   />
                   <span className="text-[10px] text-[#6B7280] block mt-1">
-                    * Satu email hanya boleh memiliki 1 undangan aktif.
+                    * Satu email hanya boleh memiliki 1 undangan aktif. Surat undangan resmi dan pass QR akan otomatis langsung dikirimkan ke email ini.
                   </span>
                 </div>
 
@@ -529,7 +540,7 @@ export default function LecturerInvitationsPage() {
                     className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-[#891523] text-white font-semibold hover:bg-[#720e1a] disabled:opacity-50 transition-colors"
                   >
                     <FloppyDisk size={14} />
-                    <span>{saving ? 'Menyimpan...' : 'Simpan Undangan'}</span>
+                    <span>{saving ? 'Menyimpan & Mengirim Email...' : 'Simpan Undangan'}</span>
                   </button>
                 </div>
               </form>

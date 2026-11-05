@@ -134,9 +134,9 @@ export function AdminShell({ children, title, adminOnly = false }: AdminShellPro
           </div>
         )}
 
-        {/* Main Content Area (Independent scroll on the right side only) */}
-        <div className="flex-1 flex flex-col h-full min-w-0 overflow-y-auto">
-          <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md shadow-xs shrink-0">
+        {/* Main Content Area (Independent scroll on the right side only, strictly no horizontal overflow) */}
+        <div className="flex-1 flex flex-col h-full min-w-0 overflow-y-auto overflow-x-hidden">
+          <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md shadow-xs shrink-0 w-full">
             <AdminTopbar
               user={currentUser}
               title={title}
@@ -144,7 +144,7 @@ export function AdminShell({ children, title, adminOnly = false }: AdminShellPro
             />
           </div>
 
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto min-w-0 overflow-x-hidden">
             {children}
           </main>
         </div>

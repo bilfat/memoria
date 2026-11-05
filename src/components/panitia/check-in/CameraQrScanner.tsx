@@ -291,9 +291,9 @@ export function CameraQrScanner({ onScan, isProcessing = false }: CameraQrScanne
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full max-w-full min-w-0">
       {/* 1. Main Camera Viewfinder Stage */}
-      <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] max-h-[420px] rounded-2xl bg-neutral-950 overflow-hidden border-2 border-neutral-800 shadow-2xl flex items-center justify-center select-none group">
+      <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] max-h-[420px] rounded-2xl bg-neutral-950 overflow-hidden border-2 border-neutral-800 shadow-2xl flex items-center justify-center select-none group max-w-full">
         {/* Hidden video & offscreen canvas */}
         <video
           ref={videoRef}
@@ -419,13 +419,13 @@ export function CameraQrScanner({ onScan, isProcessing = false }: CameraQrScanne
       )}
 
       {/* 2. Camera Controls Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-200">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-xl bg-neutral-50 border border-neutral-200 w-full max-w-full min-w-0">
+        <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
           {isCameraActive ? (
             <button
               type="button"
               onClick={stopCameraStream}
-              className="px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+              className="px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer"
             >
               <VideoCameraSlash size={15} weight="bold" />
               <span>Matikan Kamera</span>
@@ -435,7 +435,7 @@ export function CameraQrScanner({ onScan, isProcessing = false }: CameraQrScanne
               type="button"
               onClick={() => startCameraStream(selectedDeviceId)}
               disabled={cameraLoading}
-              className="px-3.5 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50"
+              className="px-3.5 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50 shrink-0 cursor-pointer"
             >
               <VideoCamera size={15} weight="bold" />
               <span>Buka Kamera</span>
@@ -453,7 +453,7 @@ export function CameraQrScanner({ onScan, isProcessing = false }: CameraQrScanne
                   startCameraStream(id);
                 }
               }}
-              className="text-xs px-2.5 py-2 rounded-lg border border-neutral-300 bg-white text-neutral-700 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+              className="text-xs px-2.5 py-2 rounded-lg border border-neutral-300 bg-white text-neutral-700 focus:outline-none focus:ring-1 focus:ring-neutral-900 max-w-[170px] sm:max-w-xs truncate cursor-pointer"
             >
               {videoDevices.map((d, idx) => (
                 <option key={d.deviceId || idx} value={d.deviceId}>
@@ -465,7 +465,7 @@ export function CameraQrScanner({ onScan, isProcessing = false }: CameraQrScanne
         </div>
 
         {/* Cadangan: Unggah Gambar QR dari File */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <input
             type="file"
             ref={fileInputRef}
@@ -476,11 +476,11 @@ export function CameraQrScanner({ onScan, isProcessing = false }: CameraQrScanne
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-2 rounded-lg border border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-700 text-xs font-medium flex items-center gap-1.5 transition-colors"
+            className="px-3 py-2 rounded-lg border border-neutral-300 bg-white hover:bg-neutral-100 text-neutral-700 text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
             title="Unggah berkas foto/screenshot QR code tiket"
           >
             <UploadSimple size={15} />
-            <span>Unggah Gambar QR</span>
+            <span>Unggah Foto QR</span>
           </button>
         </div>
       </div>

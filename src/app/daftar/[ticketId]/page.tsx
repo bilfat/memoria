@@ -310,7 +310,10 @@ function TicketRegistrationContent({
                 className="w-full py-4 rounded-full bg-gradient-to-r from-memoria-burgundy to-memoria-stage-red border border-memoria-gold text-memoria-ivory font-bold text-sm uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-98 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {submitting ? (
-                  <span>Memproses Reservasi Tiket...</span>
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-memoria-gold border-t-transparent rounded-full animate-spin" />
+                    <span>Menerbitkan Tiket & Mengirim ke Email...</span>
+                  </span>
                 ) : (
                   <>
                     <Ticket size={20} weight="fill" className="text-memoria-gold" />

@@ -99,12 +99,18 @@ export async function POST(request: NextRequest) {
 
     // 5. Langsung kirim tiket ke email peserta secara otomatis via Brevo
     try {
-      await Promise.race([
+      const emailResult = await Promise.race([
         sendTicketEmailDirect(rpcResult.participantId),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Email send timeout')), 2500)),
+        new Promise<{ success: boolean; error?: string }>((_, reject) =>
+          setTimeout(() => reject(new Error('Email send timeout')), 12000)
+        ),
       ]);
+      if (emailResult && !emailResult.success) {
+        console.warn('[API Registrations] Direct email returned error:', emailResult.error);
+        processEmailJobsBatch().catch(console.error);
+      }
     } catch (err) {
-      console.warn('[API Registrations] Direct email non-blocking fallback:', err);
+      console.warn('[API Registrations] Direct email fallback triggered:', err);
       processEmailJobsBatch().catch(console.error);
     }
 

@@ -53,12 +53,12 @@ function TicketViewContent({
     }
   }, [searchParams]);
 
-  // Otomatis menutup popup sukses setelah 3.5 detik untuk langsung menampilkan e-ticket web
+  // Otomatis menutup popup sukses setelah 8 detik untuk langsung menampilkan e-ticket web
   useEffect(() => {
     if (!showSuccessModal) return;
     const timer = setTimeout(() => {
       setShowSuccessModal(false);
-    }, 3500);
+    }, 8000);
     return () => clearTimeout(timer);
   }, [showSuccessModal]);
 
@@ -434,10 +434,10 @@ function TicketViewContent({
                   style={{ fontFamily: 'var(--font-bodoni), serif' }}
                   className="text-2xl font-bold text-memoria-ivory mt-3"
                 >
-                  Selamat, {ticket.fullName}!
+                  Selamat, {ticket?.fullName || 'Peserta'}!
                 </h3>
                 <p className="text-xs text-memoria-champagne/80 mt-1">
-                  Kategori: <strong className="text-memoria-gold">{ticket.ticketTypeName}</strong> • No: <span className="font-mono text-white">{ticket.ticketNumber}</span>
+                  Kategori: <strong className="text-memoria-gold">{ticket?.ticketTypeName || 'Eksklusif'}</strong> • No: <span className="font-mono text-white">{ticket?.ticketNumber || '-'}</span>
                 </p>
               </div>
 
@@ -448,22 +448,22 @@ function TicketViewContent({
                   <span>E-Ticket & PDF Otomatis Dikirim ke Email</span>
                 </div>
                 <p className="text-[11px] text-neutral-300">
-                  Salinan tiket digital dan file PDF resmi telah otomatis dikirimkan ke alamat email <strong className="text-white font-mono">{ticket.email}</strong>.
+                  Salinan tiket digital dan file PDF resmi telah otomatis dikirimkan ke alamat email <strong className="text-white font-mono">{ticket?.email || ''}</strong>.
                 </p>
               </div>
 
-              {/* Countdown Progress Bar (Menutup otomatis dalam 3.5 detik) */}
+              {/* Countdown Progress Bar (Menutup otomatis dalam 8 detik) */}
               <div className="space-y-1.5 pt-1">
                 <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
                   <div
                     className="bg-emerald-400 h-full rounded-full w-full"
                     style={{
-                      animation: 'shrinkProgress 3.5s linear forwards',
+                      animation: 'shrinkProgress 8s linear forwards',
                     }}
                   />
                 </div>
                 <p className="text-[10px] text-memoria-champagne/60 font-mono">
-                  Menutup otomatis dalam 3 detik untuk menampilkan E-Ticket web...
+                  Menutup otomatis dalam 8 detik untuk menampilkan E-Ticket web...
                 </p>
               </div>
 
