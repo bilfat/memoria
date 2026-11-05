@@ -312,7 +312,7 @@ function TicketRegistrationContent({
                 {submitting ? (
                   <span className="flex items-center gap-2">
                     <span className="w-4 h-4 border-2 border-memoria-gold border-t-transparent rounded-full animate-spin" />
-                    <span>Menerbitkan Tiket & Mengirim ke Email...</span>
+                    <span>Menunggu sebentar...</span>
                   </span>
                 ) : (
                   <>

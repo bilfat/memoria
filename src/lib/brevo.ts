@@ -37,7 +37,7 @@ export async function sendBrevoTransactionalEmail(
 ): Promise<SendBrevoEmailResult> {
   const apiKey = process.env.BREVO_API_KEY || '';
   const senderEmail =
-    process.env.BREVO_SENDER_EMAIL || 'noreply@memoria.telkomuniversity.ac.id';
+    process.env.BREVO_SENDER_EMAIL || 'nabilalfatih34@gmail.com';
   const senderName = process.env.BREVO_SENDER_NAME || 'Panitia MEMORIA 2026';
 
   if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('mock_') || apiKey.startsWith('your-')) {
