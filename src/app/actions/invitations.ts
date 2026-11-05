@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentStaffSession } from '@/app/actions/auth';
 import { formatWibDateTime } from '@/lib/date';
+import { sendBrevoTransactionalEmail, buildLecturerInvitationEmailHtml } from '@/lib/brevo';
+import { generateQrDataUrl } from '@/lib/qrCode';
 
 export interface InvitationTemplateDTO {
   subject: string;
@@ -449,7 +451,7 @@ export async function toggleLecturerActiveAction(id: string): Promise<{
 }
 
 /**
- * Menjadwalkan pengiriman email undangan dosen ke antrean email_jobs
+ * Mengirimkan email surat undangan resmi dosen secara langsung via Brevo
  */
 export async function enqueueLecturerEmailAction(lecturerId: string): Promise<{
   success: boolean;
@@ -464,9 +466,10 @@ export async function enqueueLecturerEmailAction(lecturerId: string): Promise<{
 
     const admin = createAdminClient();
 
+    // 1. Ambil data dosen
     const { data: lecturer, error: lecError } = await admin
       .from('lecturer_invitations')
-      .select('id, full_name, email, invitation_code')
+      .select('id, full_name, email, invitation_code, public_token, qr_token')
       .eq('id', lecturerId)
       .single();
 
@@ -474,33 +477,99 @@ export async function enqueueLecturerEmailAction(lecturerId: string): Promise<{
       return { success: false, error: 'Undangan dosen tidak ditemukan.' };
     }
 
+    if (!lecturer.email || !lecturer.email.includes('@')) {
+      return { success: false, error: 'Alamat email dosen tidak valid atau kosong.' };
+    }
+
+    // 2. Ambil informasi acara & template surat
+    const { data: eventSettings } = await admin
+      .from('event_settings')
+      .select('event_name, event_start_at, venue_name, venue_address, invitation_template')
+      .eq('id', 1)
+      .single();
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://memoria2026.com';
+    const inviteUrl = `${siteUrl}/undangan/${lecturer.public_token || lecturer.invitation_code}`;
+    const template = (eventSettings?.invitation_template as any) || {};
+    const subject = (template.subject || 'Undangan Kehormatan MEMORIA Diesnatalis 2026')
+      .replace('{{nama_dosen}}', lecturer.full_name);
+
+    const html = buildLecturerInvitationEmailHtml({
+      lecturerName: lecturer.full_name,
+      title: '',
+      invitationCode: lecturer.invitation_code,
+      inviteUrl,
+      eventName: eventSettings?.event_name || 'MEMORIA',
+      eventDate: formatWibDateTime(eventSettings?.event_start_at),
+      venueName: eventSettings?.venue_name || 'GSG (Gedung Serba Guna)',
+      venueAddress: eventSettings?.venue_address || 'Telkom University Bandung',
+      greeting: template.greeting,
+      bodyParagraph: template.body_paragraph,
+      qrToken: lecturer.qr_token,
+    });
+
+    // 3. Generate PNG attachment dari QR token resmi dosen
+    const qrDataUrl = lecturer.qr_token ? await generateQrDataUrl(lecturer.qr_token) : '';
+    const qrBase64 = qrDataUrl.replace(/^data:image\/png;base64,/, '');
+    const attachment = qrBase64
+      ? [
+          {
+            name: `QR-Undangan-${lecturer.invitation_code}.png`,
+            content: qrBase64,
+          },
+        ]
+      : undefined;
+
+    // 4. Kirim LANGSUNG via Brevo
+    const sendResult = await sendBrevoTransactionalEmail({
+      to: [{ email: lecturer.email, name: lecturer.full_name }],
+      subject,
+      htmlContent: html,
+      attachment,
+    });
+
+    // 4. Catat ke email_jobs
     const dedupeKey = `lecturer_invitation_${lecturer.id}_${Date.now()}`;
-    const { error: jobError } = await admin.from('email_jobs').insert({
+    await admin.from('email_jobs').insert({
       kind: 'lecturer_invitation',
       lecturer_id: lecturer.id,
       recipient_email: lecturer.email,
       dedupe_key: dedupeKey,
-      status: 'pending',
+      status: sendResult.success ? 'sent' : 'failed',
+      sent_at: sendResult.success ? new Date().toISOString() : null,
+      provider_message_id: sendResult.messageId || null,
+      last_error_code: sendResult.error || null,
       run_after: new Date().toISOString(),
     });
 
-    if (jobError) {
-      return { success: false, error: 'Gagal memasukkan email ke antrean pengiriman.' };
-    }
-
+    // 5. Catat ke audit_logs
     await admin.from('audit_logs').insert({
       actor_id: session.id,
-      action: 'ENQUEUE_LECTURER_EMAIL',
+      action: 'DIRECT_LECTURER_EMAIL',
       entity_type: 'email_jobs',
       entity_id: lecturer.id,
-      details: { email: lecturer.email, code: lecturer.invitation_code },
+      details: {
+        email: lecturer.email,
+        code: lecturer.invitation_code,
+        success: sendResult.success,
+        messageId: sendResult.messageId,
+        error: sendResult.error,
+      },
     });
+
+    if (!sendResult.success) {
+      return {
+        success: false,
+        error: `Gagal mengirim email: ${sendResult.error || 'Server Brevo menolak pengiriman.'}`,
+      };
+    }
 
     return {
       success: true,
-      message: `Undangan email untuk ${lecturer.full_name} telah dijadwalkan ke antrean pengiriman.`,
+      message: `Surat undangan resmi berhasil dikirim langsung ke ${lecturer.email}!`,
     };
   } catch (err: any) {
+    console.error('[enqueueLecturerEmailAction] Exception:', err);
     return { success: false, error: err.message || 'Terjadi kesalahan sistem.' };
   }
 }
@@ -516,12 +585,13 @@ export async function getPublicInvitationByTokenAction(
   try {
     const admin = createAdminClient();
 
-    // 1. Ambil data undangan dosen
+    // 1. Ambil data undangan dosen (mendukung public_token maupun invitation_code)
+    const cleanToken = token.trim();
     const { data: lecturer, error: lecError } = await admin
       .from('lecturer_invitations')
       .select('*')
-      .eq('public_token', token.trim())
-      .single();
+      .or(`public_token.eq.${cleanToken},invitation_code.ilike.${cleanToken}`)
+      .maybeSingle();
 
     if (lecError || !lecturer) {
       return null;
@@ -569,6 +639,68 @@ export async function getPublicInvitationByTokenAction(
   } catch (err) {
     console.error('[getPublicInvitationByTokenAction] Error:', err);
     return null;
+  }
+}
+
+/**
+ * Menghapus data undangan dosen secara permanen (hard delete) dari database.
+ * Relasi check-in dan antrean email terhapus otomatis via database foreign key CASCADE.
+ */
+export async function deleteLecturerInvitationPermanentlyAction(lecturerId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const session = await getCurrentStaffSession();
+    if (!session) {
+      return { success: false, error: 'Sesi login tidak sah atau telah berakhir.' };
+    }
+
+    const admin = createAdminClient();
+
+    // 1. Ambil data undangan dosen sebelum dihapus
+    const { data: lecturer, error: fetchErr } = await admin
+      .from('lecturer_invitations')
+      .select('id, full_name, email, invitation_code')
+      .eq('id', lecturerId)
+      .single();
+
+    if (fetchErr || !lecturer) {
+      return { success: false, error: 'Data undangan dosen tidak ditemukan.' };
+    }
+
+    // 2. Hapus undangan dosen secara permanen
+    const { error: delErr } = await admin
+      .from('lecturer_invitations')
+      .delete()
+      .eq('id', lecturerId);
+
+    if (delErr) {
+      console.error('[deleteLecturerInvitationPermanentlyAction] Error:', delErr);
+      return { success: false, error: delErr.message };
+    }
+
+    // 3. Catat ke audit log
+    await admin.from('audit_logs').insert({
+      actor_id: session.id,
+      action: 'DELETE_LECTURER_PERMANENT',
+      entity_type: 'lecturer_invitations',
+      entity_id: lecturerId,
+      details: {
+        name: lecturer.full_name,
+        email: lecturer.email,
+        code: lecturer.invitation_code,
+        deleted_at: new Date().toISOString(),
+      },
+    });
+
+    revalidatePath('/panitia/undangan/dosen');
+    revalidatePath('/panitia/check-in');
+    revalidatePath('/panitia');
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Terjadi kesalahan sistem.' };
   }
 }
 

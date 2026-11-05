@@ -9,6 +9,7 @@ import {
   updateParticipantAction,
   archiveParticipantAction,
   restoreParticipantAction,
+  deleteParticipantPermanentlyAction,
   ParticipantListItemDTO,
 } from '@/app/actions/participants';
 import { listAdminTicketsAction, TicketTypeAdminDTO } from '@/app/actions/tickets';
@@ -32,6 +33,7 @@ import {
   Lock,
   Warning,
   ArrowUUpLeft,
+  Trash,
 } from '@phosphor-icons/react';
 
 function ParticipantsContent() {
@@ -70,6 +72,7 @@ function ParticipantsContent() {
   const [adminPasswordConfirm, setAdminPasswordConfirm] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [sendingParticipantId, setSendingParticipantId] = useState<string | null>(null);
 
   // Two-step Archive Modal
   const [archiveModalOpen, setArchiveModalOpen] = useState(false);
@@ -87,7 +90,53 @@ function ParticipantsContent() {
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [restoreSubmitting, setRestoreSubmitting] = useState(false);
 
+  // Hard Delete Modal
+  const [deleteTarget, setDeleteTarget] = useState<ParticipantListItemDTO | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
   const { success, error: toastError, info } = useToast();
+
+  const handleOpenDelete = (p: ParticipantListItemDTO) => {
+    setDeleteTarget(p);
+    setDeleteConfirmText('');
+    setDeleteError(null);
+  };
+
+  const handleConfirmDelete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deleteTarget) return;
+
+    if (deleteConfirmText.trim().toUpperCase() !== 'HAPUS') {
+      setDeleteError('Ketik kata "HAPUS" untuk mengonfirmasi penghapusan permanen.');
+      return;
+    }
+
+    setDeleteSubmitting(true);
+    setDeleteError(null);
+
+    try {
+      const res = await deleteParticipantPermanentlyAction(deleteTarget.id);
+      if (res.success) {
+        success(
+          'Peserta Berhasil Dihapus Permanen',
+          res.restoredQuota
+            ? `Data ${deleteTarget.fullName} telah dihapus permanen dari database. Kuota tiket ${deleteTarget.ticketTypeName} bertambah 1.`
+            : `Data ${deleteTarget.fullName} telah dihapus permanen dari database.`
+        );
+        setDeleteTarget(null);
+        await loadParticipants();
+      } else {
+        setDeleteError(res.error || 'Gagal menghapus data peserta.');
+        toastError('Gagal Menghapus', res.error || 'Terjadi kesalahan sistem.');
+      }
+    } catch (err: any) {
+      setDeleteError(err.message || 'Terjadi kesalahan sistem.');
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
 
   const loadParticipants = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -167,15 +216,20 @@ function ParticipantsContent() {
     success('Mengunduh Excel', 'Berkas XLSX resmi sedang diproses dan diunduh.');
   };
 
-  const handleResendEmail = (p: ParticipantListItemDTO) => {
-    startTransition(async () => {
+  const handleResendEmail = async (p: ParticipantListItemDTO) => {
+    setSendingParticipantId(p.id);
+    try {
       const res = await enqueueTicketResendAction(p.id);
       if (res.success) {
-        info('Antrean Email Dijadwalkan', res.message || 'Tiket telah dijadwalkan ke antrean email.');
+        success('Email Terkirim', res.message || 'Tiket telah dikirimkan ke email peserta.');
       } else {
-        toastError('Gagal Menjadwalkan Email', res.error || 'Terjadi kesalahan.');
+        toastError('Gagal Mengirim Email', res.error || 'Terjadi kesalahan.');
       }
-    });
+    } catch (err: any) {
+      toastError('Gagal Mengirim Email', err.message || 'Terjadi kesalahan sistem.');
+    } finally {
+      setSendingParticipantId(null);
+    }
   };
 
   // Two-step Edit Handlers
@@ -521,11 +575,19 @@ function ParticipantsContent() {
                             </Link>
                             <button
                               onClick={() => handleResendEmail(p)}
-                              disabled={isPending}
-                              className="p-1.5 rounded-md hover:bg-[#E5E7EB] text-[#4B5563] transition-colors"
-                              title="Kirim Ulang Tiket ke Email"
+                              disabled={sendingParticipantId === p.id}
+                              className={`p-1.5 rounded-md transition-colors ${
+                                sendingParticipantId === p.id
+                                  ? 'bg-amber-100 text-amber-700 animate-pulse cursor-not-allowed'
+                                  : 'hover:bg-[#E5E7EB] text-[#4B5563]'
+                              }`}
+                              title="Kirim Ulang Tiket Resmi ke Email"
                             >
-                              <EnvelopeSimple size={15} />
+                              {sendingParticipantId === p.id ? (
+                                <div className="w-3.5 h-3.5 border-2 border-[#891523] border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <EnvelopeSimple size={15} />
+                              )}
                             </button>
                             <button
                               onClick={() => handleOpenEdit(p)}
@@ -551,6 +613,13 @@ function ParticipantsContent() {
                                 <ArrowUUpLeft size={15} weight="bold" />
                               </button>
                             )}
+                            <button
+                              onClick={() => handleOpenDelete(p)}
+                              className="p-1.5 rounded-md hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
+                              title="Hapus Permanen Data Peserta (Kembalikan Kuota)"
+                            >
+                              <Trash size={15} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -946,6 +1015,107 @@ function ParticipantsContent() {
                   className="px-4 py-2 rounded-lg bg-emerald-700 text-white font-semibold hover:bg-emerald-800 disabled:opacity-50"
                 >
                   {restoreSubmitting ? 'Memeriksa Kuota...' : 'Konfirmasi Pulihkan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* HARD DELETE PARTICIPANT PERMANENT MODAL */}
+      {/* ========================================================================= */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
+              <div className="flex items-center gap-2 text-rose-700">
+                <Trash size={18} weight="bold" />
+                <h3 className="text-sm font-bold">Hapus Data Peserta Permanen</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="p-1 rounded-md text-[#6B7280] hover:bg-[#F3F4F6]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-medium">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="p-3.5 bg-rose-50/60 rounded-xl border border-rose-200 text-rose-950 space-y-2">
+              <div className="flex items-start gap-2">
+                <Warning size={18} weight="fill" className="text-rose-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-bold text-rose-800 block">Tindakan ini tidak dapat dibatalkan!</span>
+                  <p className="text-[11px] leading-relaxed text-rose-700">
+                    Seluruh data peserta ini, nomor tiket, kode QR, riwayat check-in presensi, serta email antrean akan <strong>terhapus permanen dari database</strong>.
+                  </p>
+                </div>
+              </div>
+
+              {deleteTarget.status === 'active' && (
+                <div className="pt-2 border-t border-rose-200/80 text-[11px] font-semibold text-emerald-800 bg-emerald-50/80 p-2 rounded-lg border border-emerald-200">
+                  ✓ Kuota tiket <strong>{deleteTarget.ticketTypeName}</strong> akan otomatis <strong>dikembalikan 1 tiket</strong> ke publik.
+                </div>
+              )}
+            </div>
+
+            {/* Target Summary Card */}
+            <div className="bg-neutral-50 rounded-xl p-3 border border-neutral-200 space-y-1.5 font-mono text-[11px]">
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-sans">Nama:</span>
+                <span className="font-bold font-sans text-neutral-900">{deleteTarget.fullName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-sans">NIM:</span>
+                <span className="font-bold text-neutral-800">{deleteTarget.nim}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-sans">No. Tiket:</span>
+                <span className="text-neutral-800">{deleteTarget.ticketNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500 font-sans">Kategori Tiket:</span>
+                <span className="text-[#891523] font-sans font-semibold">{deleteTarget.ticketTypeName}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmDelete} className="space-y-4">
+              <div>
+                <label className="block font-semibold text-[#374151] mb-1">
+                  Ketik kata <span className="font-bold text-rose-700 font-mono">HAPUS</span> untuk mengonfirmasi:
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Ketik HAPUS..."
+                  className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-rose-600 font-mono uppercase"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2 border-t border-[#E5E7EB]">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(null)}
+                  className="px-4 py-2 rounded-lg border border-[#D1D5DB] text-[#4B5563] hover:bg-[#F3F4F6] cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={deleteSubmitting || deleteConfirmText.trim().toUpperCase() !== 'HAPUS'}
+                  className="px-4 py-2 rounded-lg bg-rose-700 text-white font-semibold hover:bg-rose-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                >
+                  {deleteSubmitting ? 'Menghapus Permanen...' : 'Hapus Permanen dari Database'}
                 </button>
               </div>
             </form>

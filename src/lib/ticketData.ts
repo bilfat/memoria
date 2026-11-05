@@ -35,14 +35,17 @@ export async function fetchTicketByAccessToken(token: string): Promise<TicketVie
   try {
     const admin = createAdminClient();
 
-    // 1. Ambil data peserta berdasarkan ticket_access_token
+    // 1. Ambil data peserta berdasarkan ticket_access_token, qr_token, atau id
+    const cleanToken = token.trim();
     const { data: participant, error: partError } = await admin
       .from('participants')
       .select('id, full_name, nim, study_program, faculty, phone, email, ticket_number, ticket_type_id, ticket_access_token, qr_token, status, created_at')
-      .eq('ticket_access_token', token.trim())
-      .single();
+      .or(`ticket_access_token.eq.${cleanToken},qr_token.eq.${cleanToken},id.eq.${cleanToken}`)
+      .limit(1)
+      .maybeSingle();
 
     if (partError || !participant) {
+      console.warn('[fetchTicketByAccessToken] Participant not found for token:', cleanToken, partError);
       return null;
     }
 
@@ -51,19 +54,21 @@ export async function fetchTicketByAccessToken(token: string): Promise<TicketVie
       .from('ticket_types')
       .select('name')
       .eq('id', participant.ticket_type_id)
-      .single();
+      .maybeSingle();
 
-    // 3. Ambil data event settings terbaru
-    const { data: eventSettings, error: eventError } = await admin
+    // 3. Ambil data event settings terbaru dengan fallback aman jika tabel belum memiliki row id=1
+    const { data: eventSettings } = await admin
       .from('event_settings')
       .select('event_name, event_start_at, venue_name, venue_address, footer_text')
-      .eq('id', 1)
-      .single();
+      .order('id', { ascending: true })
+      .limit(1)
+      .maybeSingle();
 
-    if (eventError || !eventSettings) {
-      console.error('[fetchTicketByAccessToken] Event settings missing or error:', eventError);
-      return null;
-    }
+    const eventName = eventSettings?.event_name || 'MEMORIA 2026';
+    const eventStartAt = eventSettings?.event_start_at || '2026-11-20T18:30:00+07:00';
+    const venueName = eventSettings?.venue_name || 'Grand Ballroom & Theatre Hall';
+    const venueAddress = eventSettings?.venue_address || 'Telkom University Landmark Hall, Gedung Selaru Lt. 4, Bandung';
+    const footerText = eventSettings?.footer_text || 'MEMORIA 2026 — Himpunan Mahasiswa D4 Sistem Informasi Kota Cerdas, Fakultas Ilmu Terapan.';
 
     return {
       participantId: participant.id,
@@ -80,12 +85,12 @@ export async function fetchTicketByAccessToken(token: string): Promise<TicketVie
       ticketAccessToken: participant.ticket_access_token,
       qrToken: participant.qr_token,
       registeredAt: participant.created_at,
-      eventName: eventSettings.event_name,
-      eventStartAt: eventSettings.event_start_at,
+      eventName,
+      eventStartAt,
       eventEndAt: null,
-      venueName: eventSettings.venue_name,
-      venueAddress: eventSettings.venue_address || '',
-      footerText: eventSettings.footer_text || '',
+      venueName,
+      venueAddress,
+      footerText,
     };
   } catch (err) {
     console.error('[fetchTicketByAccessToken] Exception:', err);

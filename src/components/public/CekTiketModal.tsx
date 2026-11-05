@@ -110,12 +110,12 @@ export function CekTiketModal({ isOpen, onClose }: CekTiketModalProps) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="cek-tiket-title"
-      className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+      className="fixed inset-0 z-[999999] overflow-y-auto"
     >
       {/* 1. BACKDROP WITH SMOOTH FADE & BLUR */}
       <div
         onClick={onClose}
-        className="fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity duration-300 animate-fadeIn"
+        className="fixed inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300 animate-fadeIn"
       />
 
       {/* Styles for Theatrical Stage Smoke / Fog Billowing from the bottom */}
@@ -178,8 +178,9 @@ export function CekTiketModal({ isOpen, onClose }: CekTiketModalProps) {
         }
       `}</style>
 
-      {/* 2. THE MODAL CARD WITH LUXURY VELVET THEATRE DESIGN */}
-      <div className="relative z-10 w-full max-w-lg bg-[#18060B] border border-[#d6b46a]/50 rounded-3xl shadow-[0_25px_70px_rgba(0,0,0,0.85),0_0_35px_rgba(214,180,106,0.18)] overflow-hidden animate-modal-pop text-memoria-ivory">
+      {/* 2. THE MODAL CARD WITH LUXURY VELVET THEATRE DESIGN - Centered with min-h-full to prevent vertical cutoff */}
+      <div className="min-h-full flex items-center justify-center p-4 sm:p-6 relative pointer-events-none">
+        <div className="relative pointer-events-auto z-10 w-full max-w-lg my-auto bg-[#18060B] border border-[#d6b46a]/50 rounded-3xl shadow-[0_25px_70px_rgba(0,0,0,0.85),0_0_35px_rgba(214,180,106,0.18)] overflow-hidden animate-modal-pop text-memoria-ivory">
         
         {/* Top Gold Shimmer Border Trim */}
         <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#f5d890] to-transparent shadow-[0_0_10px_rgba(245,216,144,0.8)]" />
@@ -345,6 +346,7 @@ export function CekTiketModal({ isOpen, onClose }: CekTiketModalProps) {
           )}
 
         </div>
+      </div>
       </div>
     </div>,
     document.body

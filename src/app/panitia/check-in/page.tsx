@@ -13,6 +13,7 @@ import {
   CheckCircle,
   Clock,
   WarningCircle,
+  Warning,
   ArrowsClockwise,
   GraduationCap,
   IdentificationBadge,
@@ -36,6 +37,14 @@ interface ResolvedAttendee {
 }
 
 interface SuccessModalData {
+  name: string;
+  ticketName: string;
+  checkedAt: string;
+  operatorName: string;
+  targetType: 'PARTICIPANT' | 'LECTURER';
+}
+
+interface AlreadyCheckedModalData {
   name: string;
   ticketName: string;
   checkedAt: string;
@@ -74,6 +83,8 @@ export default function CheckinPage() {
 
   // Success Confirmation Popup State
   const [successModal, setSuccessModal] = useState<SuccessModalData | null>(null);
+  // Duplicate / Already Checked Confirmation Popup State
+  const [alreadyCheckedModal, setAlreadyCheckedModal] = useState<AlreadyCheckedModalData | null>(null);
 
   // Load live history & stats from Supabase
   const loadHistoryData = useCallback(async () => {
@@ -133,12 +144,26 @@ export default function CheckinPage() {
         return;
       }
 
-      setScanResult({
-        attendee: data.attendee,
-        resolutionToken: data.resolutionToken,
-      });
+      // Jika peserta sudah pernah check-in sebelumnya, langsung tampilkan modal popup peringatan di tengah
+      if (data.attendee.isCheckedIn) {
+        setAlreadyCheckedModal({
+          name: data.attendee.name,
+          ticketName: data.attendee.ticketName,
+          checkedAt: data.attendee.firstCheckedInAt || new Date().toISOString(),
+          operatorName: data.attendee.operatorName || 'Panitia MEMORIA',
+          targetType: data.attendee.targetType,
+        });
+        setScanResult(null);
+        return;
+      }
+
+      // Otomatis langsung catat kehadiran jika tiket sah dan belum check-in
+      if (!data.attendee.isCheckedIn && data.resolutionToken) {
+        await handleConfirmCheckin(data.resolutionToken, 'CAMERA_QR', data.attendee);
+      }
     } catch (err: any) {
       setScanError(err.message || 'Gagal memproses QR Code.');
+      setTimeout(() => setScanError(null), 3000);
     } finally {
       setLoading(false);
     }
@@ -209,23 +234,17 @@ export default function CheckinPage() {
       }
 
       if (data.outcome === 'ALREADY_CHECKED_IN') {
-        info(
-          'Sudah Check-In Sebelumnya',
-          `${data.name} telah tercatat hadir pada ${formatWibDateTime(data.checkedAt)}.`
-        );
+        // Tampilkan Popup Modal Peringatan di Tengah Layar (Laptop & HP)
+        setAlreadyCheckedModal({
+          name: data.name || attendee.name,
+          ticketName: data.ticketName || attendee.ticketName,
+          checkedAt: data.checkedAt || attendee.firstCheckedInAt || new Date().toISOString(),
+          operatorName: data.operatorName || attendee.operatorName || 'Panitia MEMORIA',
+          targetType: attendee.targetType,
+        });
 
-        // Update current preview card to reflect checked-in status
-        const updatedAttendee: ResolvedAttendee = {
-          ...attendee,
-          isCheckedIn: true,
-          firstCheckedInAt: data.checkedAt,
-          canCheckIn: false,
-        };
-        if (method === 'CAMERA_QR' && scanResult) {
-          setScanResult({ attendee: updatedAttendee, resolutionToken: '' });
-        } else if (method === 'MANUAL' && manualResult) {
-          setManualResult({ attendee: updatedAttendee, resolutionToken: '' });
-        }
+        setScanResult(null);
+        setManualResult(null);
       } else if (data.outcome === 'CREATED') {
         // Tampilkan Popup Sukses Resmi
         setSuccessModal({
@@ -242,8 +261,8 @@ export default function CheckinPage() {
         setManualQuery('');
       }
 
-      // Refresh data riwayat presensi & counter KPI
-      await loadHistoryData();
+      // Refresh data riwayat presensi & counter KPI di background tanpa memblokir rendering popup
+      loadHistoryData().catch(console.error);
     } catch (err: any) {
       toastError('Gagal Check-In', err.message || 'Terjadi kesalahan jaringan.');
     } finally {
@@ -255,6 +274,24 @@ export default function CheckinPage() {
   const handleCloseSuccessModal = () => {
     setSuccessModal(null);
   };
+
+  // Otomatis menutup popup modal sukses setelah 2.5 detik tanpa perlu klik tombol
+  useEffect(() => {
+    if (!successModal) return;
+    const timer = setTimeout(() => {
+      setSuccessModal(null);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [successModal]);
+
+  // Otomatis menutup popup modal sudah check-in setelah 3.5 detik tanpa perlu klik tombol
+  useEffect(() => {
+    if (!alreadyCheckedModal) return;
+    const timer = setTimeout(() => {
+      setAlreadyCheckedModal(null);
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [alreadyCheckedModal]);
 
   // Filter history list
   const filteredRecords = useMemo(() => {
@@ -340,136 +377,31 @@ export default function CheckinPage() {
 
         {/* TAB 1: SCAN QR KAMERA */}
         {activeTab === 'SCAN' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left 2 Cols: Live Camera Scanner */}
-              <div className="lg:col-span-2 space-y-4">
-                <div className="bg-white rounded-xl border border-neutral-200 p-6 space-y-4 shadow-sm">
-                  <div>
-                    <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-                      <QrCode size={18} className="text-emerald-600" />
-                      Pemindai Kamera QR Code Tiket / Undangan
-                    </h3>
-                    <p className="text-xs text-neutral-500 mt-1 leading-relaxed">
-                      Arahkan kamera ke QR Code e-ticket Mahasiswa atau lembar undangan Dosen.
-                      Sistem otomatis memverifikasi identitas, status tiket aktif, dan mencegah presensi ganda.
-                    </p>
-                  </div>
+          <div className="max-w-2xl mx-auto space-y-4">
+            <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4 shadow-sm text-center">
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900 inline-flex items-center gap-2">
+                  <QrCode size={18} className="text-emerald-600" />
+                  Pemindai Kamera QR Code Tiket / Undangan
+                </h3>
+                <p className="text-xs text-neutral-500 mt-1 leading-relaxed">
+                  Arahkan kamera ke QR Code e-ticket Mahasiswa atau lembar undangan Dosen.
+                  Sistem otomatis memverifikasi identitas, status tiket aktif, dan mencegah presensi ganda.
+                </p>
+              </div>
 
-                  {/* Real-Time Camera Scanner with HTTPS getUserMedia */}
-                  <CameraQrScanner
-                    onScan={(token) => handleLookupQr(token)}
-                    isProcessing={loading || actionLoading}
-                  />
+              {/* Real-Time Camera Scanner with HTTPS getUserMedia */}
+              <CameraQrScanner
+                onScan={(token) => handleLookupQr(token)}
+                isProcessing={loading || actionLoading || !!successModal || !!alreadyCheckedModal}
+              />
 
-                  {scanError && (
-                    <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-700 text-xs flex items-center gap-2">
-                      <WarningCircle size={18} className="shrink-0" />
-                      <span>{scanError}</span>
-                    </div>
-                  )}
+              {scanError && (
+                <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-700 text-xs flex items-center justify-center gap-2">
+                  <WarningCircle size={18} className="shrink-0" />
+                  <span>{scanError}</span>
                 </div>
-              </div>
-
-              {/* Right Col: Verified Attendee Preview Card */}
-              <div className="space-y-4">
-                {scanResult ? (
-                  <div className="bg-white rounded-xl border-2 border-neutral-900 p-6 shadow-md space-y-4">
-                    <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-                      <span className="text-[10px] font-bold tracking-wider uppercase text-neutral-500">
-                        Hasil Verifikasi QR
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          scanResult.attendee.targetType === 'PARTICIPANT'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {scanResult.attendee.targetType === 'PARTICIPANT' ? 'MAHASISWA' : 'DOSEN VIP'}
-                      </span>
-                    </div>
-
-                    <div className="space-y-1">
-                      <h4 className="text-base font-extrabold text-neutral-900">
-                        {scanResult.attendee.name}
-                      </h4>
-                      <p className="text-xs font-mono text-neutral-600">
-                        {scanResult.attendee.targetType === 'PARTICIPANT'
-                          ? `NIM: ${scanResult.attendee.identifierMasked}`
-                          : `Kode: ${scanResult.attendee.identifier}`}
-                      </p>
-                      <p className="text-[11px] text-neutral-500">
-                        {scanResult.attendee.subtext}
-                      </p>
-                      <div className="inline-block mt-1 px-2 py-0.5 rounded bg-neutral-100 text-[10px] font-semibold text-neutral-700">
-                        {scanResult.attendee.ticketName}
-                      </div>
-                    </div>
-
-                    {/* Attendance status badge */}
-                    {scanResult.attendee.isCheckedIn ? (
-                      <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 space-y-1">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
-                          <CheckCircle size={16} weight="fill" className="text-amber-600" />
-                          SUDAH CHECK-IN SEBELUMNYA
-                        </div>
-                        <div className="text-[11px] text-amber-800">
-                          Waktu: <strong>{formatWibDateTime(scanResult.attendee.firstCheckedInAt || '')}</strong>
-                        </div>
-                        <div className="text-[10px] text-amber-700">
-                          Operator: {scanResult.attendee.operatorName}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 space-y-1">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
-                          <Clock size={16} />
-                          BELUM CHECK-IN
-                        </div>
-                        <p className="text-[11px] text-emerald-700">
-                          Tiket / Undangan terverifikasi sah dan siap dihadirkan.
-                        </p>
-                      </div>
-                    )}
-
-                    <div>
-                      {scanResult.attendee.isCheckedIn ? (
-                        <button
-                          disabled
-                          className="w-full py-2.5 rounded-lg bg-neutral-200 text-neutral-500 text-xs font-bold cursor-not-allowed"
-                        >
-                          Telah Hadir (Presensi Terkunci)
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={actionLoading}
-                          onClick={() =>
-                            handleConfirmCheckin(
-                              scanResult.resolutionToken,
-                              'CAMERA_QR',
-                              scanResult.attendee
-                            )
-                          }
-                          className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                        >
-                          <CheckCircle size={16} weight="bold" />
-                          {actionLoading ? 'Mencatat Kehadiran...' : 'Hadirkan Sekarang'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="h-64 rounded-xl border border-dashed border-neutral-300 bg-white flex flex-col items-center justify-center text-center p-6 text-neutral-400">
-                    <QrCode size={36} className="mb-2 opacity-50" />
-                    <span className="text-xs font-medium">Belum ada QR yang dipindai</span>
-                    <span className="text-[11px] text-neutral-400 mt-1">
-                      Arahkan kamera ke tiket atau masukkan token untuk memverifikasi tamu.
-                    </span>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -598,27 +530,51 @@ export default function CheckinPage() {
                   </div>
 
                   {manualResult.attendee.isCheckedIn ? (
-                    <div className="text-xs text-amber-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
-                      Telah check-in pada{' '}
-                      <strong>{formatWibDateTime(manualResult.attendee.firstCheckedInAt || '')}</strong>{' '}
-                      oleh operator {manualResult.attendee.operatorName}.
+                    <div className="space-y-2">
+                      <div className="text-xs text-amber-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                        Telah check-in pada{' '}
+                        <strong>{formatWibDateTime(manualResult.attendee.firstCheckedInAt || '')}</strong>{' '}
+                        oleh operator {manualResult.attendee.operatorName}.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualResult(null);
+                          setManualQuery('');
+                        }}
+                        className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-semibold rounded-lg transition-colors"
+                      >
+                        Cari Tamu Lain
+                      </button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      disabled={actionLoading}
-                      onClick={() =>
-                        handleConfirmCheckin(
-                          manualResult.resolutionToken,
-                          'MANUAL',
-                          manualResult.attendee
-                        )
-                      }
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer disabled:opacity-50"
-                    >
-                      <CheckCircle size={15} weight="bold" />
-                      {actionLoading ? 'Mencatat Kehadiran...' : 'Hadirkan Peserta Secara Manual'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={actionLoading}
+                        onClick={() =>
+                          handleConfirmCheckin(
+                            manualResult.resolutionToken,
+                            'MANUAL',
+                            manualResult.attendee
+                          )
+                        }
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer disabled:opacity-50"
+                      >
+                        <CheckCircle size={15} weight="bold" />
+                        {actionLoading ? 'Mencatat Kehadiran...' : 'Hadirkan Peserta Secara Manual'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualResult(null);
+                          setManualQuery('');
+                        }}
+                        className="px-4 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 text-xs font-medium rounded-lg transition-colors"
+                      >
+                        Batal
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -743,9 +699,39 @@ export default function CheckinPage() {
                 <X size={18} />
               </button>
 
-              {/* Animated Green Checkmark Icon */}
-              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center shadow-inner">
-                <CheckCircle size={40} weight="fill" className="animate-bounce" />
+              {/* Ultra-Smooth Animated SVG Checkmark Icon */}
+              <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+                {/* Glowing Pulse Halo */}
+                <div
+                  className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping"
+                  style={{ animationDuration: '1.8s' }}
+                />
+                <div className="absolute inset-1.5 rounded-full bg-gradient-to-tr from-emerald-100 via-emerald-50 to-teal-50 border border-emerald-200/60 shadow-inner" />
+
+                {/* Smooth Animated SVG Drawing Checkmark */}
+                <svg
+                  className="relative w-14 h-14 text-emerald-600 drop-shadow-[0_4px_10px_rgba(16,185,129,0.3)]"
+                  viewBox="0 0 52 52"
+                  fill="none"
+                >
+                  <circle
+                    cx="26"
+                    cy="26"
+                    r="23"
+                    className="checkmark-circle-anim"
+                    stroke="#10B981"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M15 27.5L22.5 35L37.5 18"
+                    className="checkmark-check-anim"
+                    stroke="#059669"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </div>
 
               <div>
@@ -775,13 +761,165 @@ export default function CheckinPage() {
                 </div>
               </div>
 
+              {/* Countdown Progress Bar (Auto-dismiss in 2.5s) */}
+              <div className="space-y-1.5 pt-1">
+                <div className="w-full bg-neutral-100 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-full rounded-full w-full"
+                    style={{
+                      animation: 'shrinkProgress 2.5s linear forwards',
+                    }}
+                  />
+                </div>
+                <p className="text-[10px] text-neutral-400 font-medium">
+                  Menutup otomatis dalam 2.5 detik untuk scan berikutnya...
+                </p>
+              </div>
+
+              <style jsx>{`
+                @keyframes shrinkProgress {
+                  from {
+                    width: 100%;
+                  }
+                  to {
+                    width: 0%;
+                  }
+                }
+
+                @keyframes checkCircleDraw {
+                  0% {
+                    stroke-dashoffset: 150;
+                    stroke-dasharray: 150;
+                    transform: rotate(-90deg);
+                    transform-origin: 26px 26px;
+                  }
+                  100% {
+                    stroke-dashoffset: 0;
+                    stroke-dasharray: 150;
+                    transform: rotate(0deg);
+                    transform-origin: 26px 26px;
+                  }
+                }
+
+                @keyframes checkMarkDraw {
+                  0% {
+                    stroke-dashoffset: 45;
+                    stroke-dasharray: 45;
+                    opacity: 0;
+                  }
+                  40% {
+                    opacity: 1;
+                  }
+                  100% {
+                    stroke-dashoffset: 0;
+                    stroke-dasharray: 45;
+                    opacity: 1;
+                  }
+                }
+
+                :global(.checkmark-circle-anim) {
+                  stroke-dasharray: 150;
+                  stroke-dashoffset: 150;
+                  animation: checkCircleDraw 0.55s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+                }
+
+                :global(.checkmark-check-anim) {
+                  stroke-dasharray: 45;
+                  stroke-dashoffset: 45;
+                  animation: checkMarkDraw 0.4s 0.35s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+                }
+              `}</style>
+
               <button
                 type="button"
                 autoFocus
                 onClick={handleCloseSuccessModal}
-                className="w-full py-3 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold shadow-md cursor-pointer transition-transform active:scale-98"
+                className="w-full py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold shadow-md cursor-pointer transition-transform active:scale-98"
               >
-                Scan Tamu Berikutnya
+                Scan Tamu Berikutnya (Tutup Cepat)
+              </button>
+            </div>
+          </div>
+        )}
+        {/* POPUP SUDAH CHECK-IN SEBELUMNYA (MODAL POPUP DI TENGAH LAYAR) */}
+        {alreadyCheckedModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-950/70 backdrop-blur-xs animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 text-center shadow-2xl border border-amber-300 space-y-4 relative animate-scaleUp">
+              <button
+                type="button"
+                onClick={() => setAlreadyCheckedModal(null)}
+                className="absolute top-4 right-4 p-1 rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 cursor-pointer"
+                title="Tutup"
+              >
+                <X size={18} />
+              </button>
+
+              {/* Glowing Amber Pulse Halo & Icon */}
+              <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+                <div
+                  className="absolute inset-0 rounded-full bg-amber-500/20 animate-ping"
+                  style={{ animationDuration: '2s' }}
+                />
+                <div className="absolute inset-1.5 rounded-full bg-gradient-to-tr from-amber-100 via-amber-50 to-orange-50 border border-amber-300 shadow-inner" />
+                <Warning
+                  size={36}
+                  weight="fill"
+                  className="relative text-amber-600 drop-shadow-[0_4px_10px_rgba(245,158,11,0.3)]"
+                />
+              </div>
+
+              <div>
+                <span className="text-[11px] font-bold tracking-wider uppercase text-amber-700 bg-amber-100 px-3 py-1 rounded-full border border-amber-200 inline-block">
+                  Sudah Check-In Sebelumnya
+                </span>
+                <h3 className="text-xl font-extrabold text-neutral-900 mt-2">
+                  {alreadyCheckedModal.name}
+                </h3>
+                <p className="text-xs text-neutral-500 mt-0.5">
+                  {alreadyCheckedModal.ticketName}
+                </p>
+              </div>
+
+              <div className="bg-amber-50/80 rounded-xl p-3.5 border border-amber-200 text-left text-xs space-y-1.5">
+                <div className="flex justify-between text-amber-900">
+                  <span className="text-neutral-600">Waktu Presensi Awal:</span>
+                  <span className="font-bold">
+                    {formatWibDateTime(alreadyCheckedModal.checkedAt)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-amber-900">
+                  <span className="text-neutral-600">Petugas / Operator:</span>
+                  <span className="font-bold">
+                    {alreadyCheckedModal.operatorName}
+                  </span>
+                </div>
+                <div className="text-[11px] text-amber-700 pt-1.5 border-t border-amber-200/60 text-center font-medium">
+                  Tamu ini telah tercatat hadir. Presensi ganda dicegah oleh sistem.
+                </div>
+              </div>
+
+              {/* Countdown Progress Bar (Auto-dismiss in 3.5s) */}
+              <div className="space-y-1.5 pt-1">
+                <div className="w-full bg-neutral-100 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-amber-500 h-full rounded-full w-full"
+                    style={{
+                      animation: 'shrinkProgress 3.5s linear forwards',
+                    }}
+                  />
+                </div>
+                <p className="text-[10px] text-neutral-400 font-medium">
+                  Menutup otomatis dalam 3.5 detik untuk scan berikutnya...
+                </p>
+              </div>
+
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setAlreadyCheckedModal(null)}
+                className="w-full py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md cursor-pointer transition-transform active:scale-98"
+              >
+                Tutup & Siap Scan Berikutnya
               </button>
             </div>
           </div>

@@ -8,6 +8,7 @@ import {
   saveLecturerInvitationAction,
   toggleLecturerActiveAction,
   enqueueLecturerEmailAction,
+  deleteLecturerInvitationPermanentlyAction,
   LecturerListItemDTO,
 } from '@/app/actions/invitations';
 import { formatWibTimeOnly } from '@/lib/date';
@@ -28,6 +29,8 @@ import {
   ToggleLeft,
   ToggleRight,
   ArrowClockwise,
+  Trash,
+  Warning,
 } from '@phosphor-icons/react';
 
 export default function LecturerInvitationsPage() {
@@ -47,7 +50,52 @@ export default function LecturerInvitationsPage() {
   const [formEmail, setFormEmail] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [saving, setSaving] = useState(false);
+  const [sendingLecId, setSendingLecId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Delete Modal State
+  const [deleteTarget, setDeleteTarget] = useState<LecturerListItemDTO | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const handleOpenDelete = (lec: LecturerListItemDTO) => {
+    setDeleteTarget(lec);
+    setDeleteConfirmText('');
+    setDeleteError(null);
+  };
+
+  const handleConfirmDelete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deleteTarget) return;
+
+    if (deleteConfirmText.trim().toUpperCase() !== 'HAPUS') {
+      setDeleteError('Ketik kata "HAPUS" untuk mengonfirmasi penghapusan permanen.');
+      return;
+    }
+
+    setDeleteSubmitting(true);
+    setDeleteError(null);
+
+    try {
+      const res = await deleteLecturerInvitationPermanentlyAction(deleteTarget.id);
+      if (res.success) {
+        success(
+          'Undangan Dosen Dihapus Permanen',
+          `Data undangan dosen ${deleteTarget.fullName} telah dihapus permanen dari database.`
+        );
+        setDeleteTarget(null);
+        await loadData();
+      } else {
+        setDeleteError(res.error || 'Gagal menghapus data undangan dosen.');
+        toastError('Gagal Menghapus', res.error || 'Terjadi kesalahan sistem.');
+      }
+    } catch (err: any) {
+      setDeleteError(err.message || 'Terjadi kesalahan sistem.');
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -143,15 +191,20 @@ export default function LecturerInvitationsPage() {
     }
   };
 
-  const handleSendEmail = (lec: LecturerListItemDTO) => {
-    startTransition(async () => {
+  const handleSendEmail = async (lec: LecturerListItemDTO) => {
+    setSendingLecId(lec.id);
+    try {
       const res = await enqueueLecturerEmailAction(lec.id);
       if (res.success) {
-        info('Antrean Email Dijadwalkan', res.message || 'Undangan telah dijadwalkan ke antrean email.');
+        success('Email Berhasil Dikirim', res.message || 'Surat undangan telah dikirimkan ke email dosen.');
       } else {
-        toastError('Gagal Menjadwalkan Email', res.error || 'Terjadi kesalahan sistem.');
+        toastError('Gagal Mengirim Email', res.error || 'Terjadi kesalahan sistem.');
       }
-    });
+    } catch (err: any) {
+      toastError('Gagal Mengirim Email', err.message || 'Terjadi kesalahan sistem.');
+    } finally {
+      setSendingLecId(null);
+    }
   };
 
   const handleOpenWhatsApp = (lec: LecturerListItemDTO) => {
@@ -331,11 +384,19 @@ export default function LecturerInvitationsPage() {
                             {/* Email Brevo */}
                             <button
                               onClick={() => handleSendEmail(lec)}
-                              disabled={isPending}
-                              className="p-1.5 rounded-md hover:bg-[#E5E7EB] text-[#4B5563] transition-colors"
-                              title="Jadwalkan Email Undangan"
+                              disabled={sendingLecId === lec.id}
+                              className={`p-1.5 rounded-md transition-colors ${
+                                sendingLecId === lec.id
+                                  ? 'bg-amber-100 text-amber-700 animate-pulse'
+                                  : 'hover:bg-[#E5E7EB] text-[#4B5563]'
+                              }`}
+                              title="Kirim Email Undangan Resmi Langsung"
                             >
-                              <EnvelopeSimple size={16} />
+                              {sendingLecId === lec.id ? (
+                                <div className="w-4 h-4 border-2 border-[#891523] border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <EnvelopeSimple size={16} />
+                              )}
                             </button>
 
                             {/* Copy Link */}
@@ -361,10 +422,19 @@ export default function LecturerInvitationsPage() {
                             {/* Edit */}
                             <button
                               onClick={() => handleOpenEdit(lec)}
-                              className="p-1.5 rounded-md hover:bg-[#E5E7EB] text-[#374151] transition-colors"
+                              className="p-1.5 rounded-md hover:bg-[#E5E7EB] text-[#374151] transition-colors cursor-pointer"
                               title="Edit Data Dosen"
                             >
                               <PencilSimple size={16} />
+                            </button>
+
+                            {/* Hard Delete */}
+                            <button
+                              onClick={() => handleOpenDelete(lec)}
+                              className="p-1.5 rounded-md hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
+                              title="Hapus Permanen Undangan Dosen"
+                            >
+                              <Trash size={16} />
                             </button>
                           </div>
                         </td>
@@ -460,6 +530,94 @@ export default function LecturerInvitationsPage() {
                   >
                     <FloppyDisk size={14} />
                     <span>{saving ? 'Menyimpan...' : 'Simpan Undangan'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {/* Modal Hard Delete Undangan Dosen */}
+        {deleteTarget && (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-xs">
+              <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
+                <div className="flex items-center gap-2 text-rose-700">
+                  <Trash size={18} weight="bold" />
+                  <h3 className="text-sm font-bold">Hapus Undangan Dosen Permanen</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(null)}
+                  className="p-1 rounded-md text-[#6B7280] hover:bg-[#F3F4F6]"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {deleteError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-medium">
+                  {deleteError}
+                </div>
+              )}
+
+              <div className="p-3.5 bg-rose-50/60 rounded-xl border border-rose-200 text-rose-950 space-y-2">
+                <div className="flex items-start gap-2">
+                  <Warning size={18} weight="fill" className="text-rose-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="font-bold text-rose-800 block">Tindakan ini tidak dapat dibatalkan!</span>
+                    <p className="text-[11px] leading-relaxed text-rose-700">
+                      Surat undangan, kode QR kehormatan dosen, riwayat check-in presensi, serta email antrean akan <strong>terhapus permanen dari database</strong>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Target Summary Card */}
+              <div className="bg-neutral-50 rounded-xl p-3 border border-neutral-200 space-y-1.5 font-mono text-[11px]">
+                <div className="flex justify-between">
+                  <span className="text-neutral-500 font-sans">Nama Dosen:</span>
+                  <span className="font-bold font-sans text-neutral-900">{deleteTarget.fullName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-500 font-sans">Email:</span>
+                  <span className="text-neutral-800">{deleteTarget.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-neutral-500 font-sans">Kode Undangan:</span>
+                  <span className="font-bold text-[#891523]">{deleteTarget.invitationCode}</span>
+                </div>
+              </div>
+
+              <form onSubmit={handleConfirmDelete} className="space-y-4">
+                <div>
+                  <label className="block font-semibold text-[#374151] mb-1">
+                    Ketik kata <span className="font-bold text-rose-700 font-mono">HAPUS</span> untuk mengonfirmasi:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="Ketik HAPUS..."
+                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-rose-600 font-mono uppercase"
+                  />
+                </div>
+
+                <div className="pt-3 flex justify-end gap-2 border-t border-[#E5E7EB]">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(null)}
+                    className="px-4 py-2 rounded-lg border border-[#D1D5DB] text-[#4B5563] hover:bg-[#F3F4F6] cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={deleteSubmitting || deleteConfirmText.trim().toUpperCase() !== 'HAPUS'}
+                    className="px-4 py-2 rounded-lg bg-rose-700 text-white font-semibold hover:bg-rose-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    {deleteSubmitting ? 'Menghapus Permanen...' : 'Hapus Permanen dari Database'}
                   </button>
                 </div>
               </form>

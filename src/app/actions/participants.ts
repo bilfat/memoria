@@ -578,3 +578,72 @@ export async function restoreParticipantAction(
   }
 }
 
+/**
+ * Menghapus data peserta secara permanen (hard delete) dari database.
+ * Kuota tiket otomatis kembali 1 karena active participant count berkurang.
+ * Relasi check-in dan antrean email terhapus otomatis via database foreign key CASCADE.
+ */
+export async function deleteParticipantPermanentlyAction(participantId: string): Promise<{
+  success: boolean;
+  error?: string;
+  restoredQuota?: boolean;
+}> {
+  try {
+    const session = await getCurrentStaffSession();
+    if (!session) {
+      return { success: false, error: 'Sesi login tidak sah atau telah berakhir.' };
+    }
+
+    const admin = createAdminClient();
+
+    // 1. Ambil data peserta sebelum dihapus
+    const { data: participant, error: fetchErr } = await admin
+      .from('participants')
+      .select('id, full_name, nim, email, ticket_number, ticket_type_id, status')
+      .eq('id', participantId)
+      .single();
+
+    if (fetchErr || !participant) {
+      return { success: false, error: 'Data peserta tidak ditemukan.' };
+    }
+
+    // 2. Hapus peserta secara permanen dari database
+    const { error: delErr } = await admin
+      .from('participants')
+      .delete()
+      .eq('id', participantId);
+
+    if (delErr) {
+      console.error('[deleteParticipantPermanentlyAction] Error:', delErr);
+      return { success: false, error: delErr.message };
+    }
+
+    // 3. Catat ke audit log
+    await admin.from('audit_logs').insert({
+      actor_id: session.id,
+      action: 'DELETE_PARTICIPANT_PERMANENT',
+      entity_type: 'participants',
+      entity_id: participantId,
+      details: {
+        full_name: participant.full_name,
+        nim: participant.nim,
+        email: participant.email,
+        ticket_number: participant.ticket_number,
+        ticket_type_id: participant.ticket_type_id,
+        previous_status: participant.status,
+        deleted_at: new Date().toISOString(),
+      },
+    });
+
+    revalidatePath('/panitia/peserta');
+    revalidatePath('/panitia/check-in');
+    revalidatePath('/panitia');
+    revalidatePath('/daftar');
+    revalidatePath('/panitia/tiket');
+
+    return { success: true, restoredQuota: participant.status === 'active' };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Terjadi kesalahan sistem.' };
+  }
+}
+

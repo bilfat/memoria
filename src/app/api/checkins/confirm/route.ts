@@ -5,7 +5,7 @@ import { verifyResolutionToken } from '@/lib/checkinCrypto';
 
 interface ConfirmRequestBody {
   resolutionToken: string;
-  method?: string; // 'CAMERA_QR' | 'MANUAL_NIM' | 'MANUAL_CODE' | 'MANUAL_EMAIL' | 'QR' | 'MANUAL'
+  method?: string; // 'CAMERA_QR' | 'MANUAL' | 'qr' | 'manual'
 }
 
 /**
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validasi HMAC signature, expiration token, dan kepemilikan sesi petugas
+    // 1. Validasi HMAC signature, expiration token, dan kepemilikan sesi petugas
     const tokenVerification = verifyResolutionToken(resolutionToken, staff.id);
     if (!tokenVerification.valid || !tokenVerification.targetType || !tokenVerification.targetId) {
       return NextResponse.json(
@@ -50,17 +50,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 2. Normalisasi method check-in agar strictly 'qr' atau 'manual'
+    const normalizedMethod: 'qr' | 'manual' = method.toLowerCase().includes('qr')
+      ? 'qr'
+      : 'manual';
+
     const supabase = createAdminClient();
 
-    // Panggil SQL RPC atomik
+    // 3. Panggil SQL RPC atomik confirm_checkin
     const { data: rpcResult, error: rpcError } = await supabase.rpc('confirm_checkin', {
       p_target_type: tokenVerification.targetType,
       p_target_id: tokenVerification.targetId,
-      p_method: method,
+      p_method: normalizedMethod,
       p_staff_id: staff.id,
     });
 
     if (rpcError) {
+      console.error('[checkins/confirm] RPC Execution Error:', rpcError);
       return NextResponse.json(
         {
           success: false,
@@ -76,26 +82,42 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           error: rpcResult.error || 'CHECKIN_REJECTED',
-          message: rpcResult.message || 'Presensi ditolak.',
+          message: rpcResult.message || 'Presensi ditolak oleh sistem.',
         },
         { status: 400 }
       );
     }
 
-    // Respons outcome resmi
+    // 4. Catat ke audit_logs
+    await supabase.from('audit_logs').insert({
+      actor_id: staff.id,
+      action: rpcResult.outcome === 'CREATED' ? 'CHECKIN_CONFIRM_SUCCESS' : 'CHECKIN_ALREADY_RECORDED',
+      entity_type: tokenVerification.targetType === 'PARTICIPANT' ? 'participants' : 'lecturer_invitations',
+      entity_id: tokenVerification.targetId,
+      details: {
+        outcome: rpcResult.outcome,
+        method: normalizedMethod,
+        operatorName: staff.fullName,
+        checkedAt: rpcResult.checkedAt,
+        attendeeName: rpcResult.name,
+      },
+    });
+
+    // 5. Respons outcome resmi
     return NextResponse.json({
       success: true,
       outcome: rpcResult.outcome, // 'CREATED' atau 'ALREADY_CHECKED_IN'
       checkedAt: rpcResult.checkedAt,
       name: rpcResult.name,
       ticketName: rpcResult.ticketName || null,
+      targetType: tokenVerification.targetType,
       operatorName: staff.fullName,
     });
   } catch (err: any) {
+    console.error('[checkins/confirm] Unexpected exception:', err);
     return NextResponse.json(
       { success: false, error: 'INTERNAL_ERROR', message: err.message || 'Terjadi kesalahan sistem.' },
       { status: 500 }
     );
   }
 }
-
