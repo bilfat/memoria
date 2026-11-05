@@ -680,7 +680,11 @@ export async function deleteLecturerInvitationPermanentlyAction(lecturerId: stri
       return { success: false, error: 'Data undangan dosen tidak ditemukan.' };
     }
 
-    // 2. Hapus undangan dosen secara permanen
+    // 2. Hapus relasi terkait terlebih dahulu (checkins & email_jobs) sebagai perlindungan ganda
+    await admin.from('checkins').delete().eq('lecturer_id', lecturerId);
+    await admin.from('email_jobs').delete().eq('lecturer_id', lecturerId);
+
+    // 3. Hapus undangan dosen secara permanen
     const { error: delErr } = await admin
       .from('lecturer_invitations')
       .delete()

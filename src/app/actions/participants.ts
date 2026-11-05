@@ -607,7 +607,11 @@ export async function deleteParticipantPermanentlyAction(participantId: string):
       return { success: false, error: 'Data peserta tidak ditemukan.' };
     }
 
-    // 2. Hapus peserta secara permanen dari database
+    // 2. Hapus relasi terkait terlebih dahulu (checkins & email_jobs) sebagai perlindungan ganda
+    await admin.from('checkins').delete().eq('participant_id', participantId);
+    await admin.from('email_jobs').delete().eq('participant_id', participantId);
+
+    // 3. Hapus peserta secara permanen dari database
     const { error: delErr } = await admin
       .from('participants')
       .delete()
