@@ -104,36 +104,51 @@ export async function sendBrevoTransactionalEmail(
 export function buildTicketEmailHtml(ticket: TicketViewData, siteUrl: string): string {
   const eTicketUrl = `${siteUrl}/tiket/${ticket.ticketAccessToken}`;
   const formattedDate = formatWibDateTime(ticket.eventStartAt);
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(ticket.qrToken)}&margin=2`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(ticket.qrToken)}&margin=2`;
 
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light dark">
-  <meta name="supported-color-schemes" content="light dark">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
   <title>E-Ticket Resmi ${ticket.eventName}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      supported-color-schemes: light;
+    }
+    /* Mencegah inversi font di Gmail / iOS Mail Dark Mode */
+    .ticket-header-title {
+      color: #FFFFFF !important;
+      -webkit-text-fill-color: #FFFFFF !important;
+    }
+    .ticket-header-sub {
+      color: #FFF3D6 !important;
+      -webkit-text-fill-color: #FFF3D6 !important;
+    }
+  </style>
 </head>
-<body style="margin: 0; padding: 8px 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-text-size-adjust: 100%;">
+<body style="margin: 0; padding: 4px 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-text-size-adjust: 100%;">
   
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f3f4f6; padding: 6px;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f3f4f6; padding: 4px;">
     <tr>
       <td align="center">
         
-        <!-- Main Compact Ticket Card (Max-Width 380px, Pas 1 Layar HP Tanpa Scroll) -->
-        <table role="presentation" width="100%" style="max-width: 380px; background-color: #FFFFFF; border: 1.5px solid #D6B46A; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 18px rgba(0,0,0,0.12);">
+        <!-- Main Compact Ticket Card (Max-Width 360px, Pas 1 Layar HP Tanpa Scroll Sama Sekali) -->
+        <table role="presentation" width="100%" style="max-width: 360px; background-color: #FFFFFF; border: 1.5px solid #D6B46A; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.12);">
           
           <!-- 1. HEADER (Deep Crimson + Crisp Gold/White Text, Kontras Tinggi Anti-Nabrak) -->
           <tr>
-            <td bgcolor="#891523" style="background-color: #891523; padding: 12px 14px; text-align: center; border-bottom: 2px solid #D6B46A;">
-              <div style="color: #F5D890 !important; -webkit-text-fill-color: #F5D890; font-size: 9.5px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 2px;">
+            <td bgcolor="#891523" style="background-color: #891523; padding: 10px 14px 8px 14px; text-align: center; border-bottom: 2px solid #D6B46A;">
+              <div class="ticket-header-sub" style="color: #FEE2E2 !important; -webkit-text-fill-color: #FEE2E2 !important; font-size: 8.5px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">
                 ★ DIESNATALIS SIKC TELKOM UNIVERSITY ★
               </div>
-              <h1 style="color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF; font-size: 20px; font-weight: 800; margin: 2px 0; font-family: Georgia, serif; letter-spacing: 2px; line-height: 1.2;">
-                ${ticket.eventName}
+              <h1 class="ticket-header-title" style="color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; font-size: 21px; font-weight: 900; margin: 2px 0; font-family: Georgia, 'Times New Roman', serif; letter-spacing: 2px; line-height: 1.15; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">
+                <span style="color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important;">${ticket.eventName}</span>
               </h1>
-              <div style="color: #FFFDF0 !important; -webkit-text-fill-color: #FFFDF0; font-size: 10.5px; opacity: 0.95;">
+              <div class="ticket-header-sub" style="color: #FDE68A !important; -webkit-text-fill-color: #FDE68A !important; font-size: 9.5px; font-weight: 600; letter-spacing: 0.5px; opacity: 0.95;">
                 Official Admission Pass • Diesnatalis 2026
               </div>
             </td>
@@ -141,31 +156,27 @@ export function buildTicketEmailHtml(ticket: TicketViewData, siteUrl: string): s
 
           <!-- 2. DATA PENTING PESERTA (Ringkas & Kontras Tajam) -->
           <tr>
-            <td style="padding: 12px 16px 8px 16px; background-color: #FFFFFF;">
-              <table width="100%" cellspacing="0" cellpadding="2.5" style="font-size: 11.5px; line-height: 1.35;">
+            <td style="padding: 10px 14px 6px 14px; background-color: #FFFFFF;">
+              <table width="100%" cellspacing="0" cellpadding="2" style="font-size: 11px; line-height: 1.3;">
                 <tr>
-                  <td style="color: #891523; font-weight: bold; width: 28%; font-size: 10px; text-transform: uppercase;">NAMA:</td>
-                  <td style="font-weight: 800; font-size: 12px; color: #111827;">${ticket.fullName}</td>
+                  <td style="color: #891523; font-weight: bold; width: 26%; font-size: 9.5px; text-transform: uppercase;">NAMA:</td>
+                  <td style="font-weight: 800; font-size: 11.5px; color: #111827;">${ticket.fullName}</td>
                 </tr>
                 <tr>
-                  <td style="color: #891523; font-weight: bold; font-size: 10px; text-transform: uppercase;">NIM:</td>
-                  <td style="font-family: monospace; font-size: 11.5px; font-weight: 700; color: #1F2937;">${ticket.nim} <span style="font-family: sans-serif; font-weight: normal; color: #4B5563; font-size: 10.5px;">(${ticket.studyProgram})</span></td>
+                  <td style="color: #891523; font-weight: bold; font-size: 9.5px; text-transform: uppercase;">NIM:</td>
+                  <td style="font-family: monospace; font-size: 11px; font-weight: 700; color: #1F2937;">${ticket.nim} <span style="font-family: sans-serif; font-weight: normal; color: #6B7280; font-size: 10px;">(${ticket.studyProgram})</span></td>
                 </tr>
                 <tr>
-                  <td style="color: #891523; font-weight: bold; font-size: 10px; text-transform: uppercase;">KATEGORI:</td>
-                  <td style="font-weight: 800; font-size: 11.5px; color: #891523;">${ticket.ticketTypeName}</td>
+                  <td style="color: #891523; font-weight: bold; font-size: 9.5px; text-transform: uppercase;">KATEGORI:</td>
+                  <td style="font-weight: 800; font-size: 11px; color: #891523;">${ticket.ticketTypeName}</td>
                 </tr>
                 <tr>
-                  <td style="color: #891523; font-weight: bold; font-size: 10px; text-transform: uppercase;">NO. TIKET:</td>
-                  <td style="font-family: monospace; font-size: 11.5px; font-weight: bold; color: #111827;">${ticket.ticketNumber}</td>
+                  <td style="color: #891523; font-weight: bold; font-size: 9.5px; text-transform: uppercase;">WAKTU:</td>
+                  <td style="font-size: 10.5px; color: #1F2937; font-weight: 600;">${formattedDate}</td>
                 </tr>
                 <tr>
-                  <td style="color: #891523; font-weight: bold; font-size: 10px; text-transform: uppercase;">WAKTU:</td>
-                  <td style="font-size: 11px; color: #1F2937; font-weight: 600;">${formattedDate}</td>
-                </tr>
-                <tr>
-                  <td style="color: #891523; font-weight: bold; font-size: 10px; text-transform: uppercase;">LOKASI:</td>
-                  <td style="font-size: 11px; color: #374151;">${ticket.venueName}</td>
+                  <td style="color: #891523; font-weight: bold; font-size: 9.5px; text-transform: uppercase;">LOKASI:</td>
+                  <td style="font-size: 10.5px; color: #374151;">${ticket.venueName}</td>
                 </tr>
               </table>
             </td>
@@ -173,28 +184,33 @@ export function buildTicketEmailHtml(ticket: TicketViewData, siteUrl: string): s
 
           <!-- 3. GARIS PERFORASI TIKET -->
           <tr>
-            <td style="padding: 0 14px; background-color: #FFFFFF;">
-              <div style="border-top: 1.5px dashed #D6B46A; width: 100%; margin: 4px 0;"></div>
+            <td style="padding: 0 12px; background-color: #FFFFFF;">
+              <div style="border-top: 1.5px dashed #D6B46A; width: 100%; margin: 2px 0;"></div>
             </td>
           </tr>
 
-          <!-- 4. QR CODE KECIL & PRESISI (Tanpa Barcode Ganda) -->
+          <!-- 4. QR CODE KECIL & PRESISI -->
           <tr>
-            <td align="center" style="padding: 8px 16px 12px 16px; background-color: #FFFFFF;">
-              <div style="color: #891523; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px;">
+            <td align="center" style="padding: 6px 14px 10px 14px; background-color: #FFFFFF;">
+              <div style="color: #891523; font-size: 9.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px;">
                 🎟️ SCAN UNTUK CHECK-IN PRESENSI
               </div>
 
-              <!-- Compact QR Box (115px) -->
-              <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto; background-color: #FFFFFF; padding: 4px; border-radius: 8px; border: 1.5px solid #D6B46A;">
+              <!-- Ultra-Compact QR Code (110px) -->
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto; background-color: #FFFFFF; padding: 3px; border-radius: 8px; border: 1.5px solid #D6B46A;">
                 <tr>
                   <td align="center">
-                    <img src="${qrCodeUrl}" alt="QR Tiket" width="115" height="115" style="display: block; width: 115px; height: 115px; border: 0;" />
+                    <img src="${qrCodeUrl}" alt="QR Tiket" width="110" height="110" style="display: block; width: 110px; height: 110px; border: 0;" />
                   </td>
                 </tr>
               </table>
 
-              <div style="color: #6B7280; font-size: 9.5px; margin-top: 5px;">
+              <!-- Kode Tiket Ringkas -->
+              <div style="color: #111827; font-size: 10.5px; font-family: monospace; font-weight: 800; margin-top: 4px; letter-spacing: 1px;">
+                ${ticket.ticketNumber}
+              </div>
+
+              <div style="color: #6B7280; font-size: 9px; margin-top: 3px;">
                 Tunjukkan QR Code ini kepada panitia saat tiba di pintu masuk.
               </div>
             </td>
@@ -202,13 +218,10 @@ export function buildTicketEmailHtml(ticket: TicketViewData, siteUrl: string): s
 
           <!-- 5. TOMBOL AKSES WEB TIKET (Ringkas) -->
           <tr>
-            <td align="center" bgcolor="#F9FAFB" style="padding: 8px 14px 10px 14px; background-color: #F9FAFB; border-top: 1px solid #E5E7EB;">
-              <a href="${eTicketUrl}" target="_blank" style="display: inline-block; padding: 6px 16px; font-size: 10.5px; font-weight: bold; background-color: #891523; color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF; text-decoration: none; border-radius: 16px; letter-spacing: 0.5px;">
+            <td align="center" bgcolor="#F9FAFB" style="padding: 6px 12px 8px 12px; background-color: #F9FAFB; border-top: 1px solid #E5E7EB;">
+              <a href="${eTicketUrl}" target="_blank" style="display: inline-block; padding: 5px 14px; font-size: 10px; font-weight: bold; background-color: #891523; color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF; text-decoration: none; border-radius: 14px; letter-spacing: 0.5px;">
                 Buka E-Ticket di Web →
               </a>
-              <div style="color: #9CA3AF; font-size: 8.5px; margin-top: 4px;">
-                Lampiran PDF e-ticket resmi juga telah disertakan pada email ini.
-              </div>
             </td>
           </tr>
 

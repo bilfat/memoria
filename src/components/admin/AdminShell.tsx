@@ -32,19 +32,40 @@ export function AdminShell({ children, title, adminOnly = false }: AdminShellPro
   const router = useRouter();
 
   // Deterministic state on SSR and initial hydration to avoid hydration mismatch
-  const [currentUser, setCurrentUser] = useState<InternalAccount | null>(null);
+  const [currentUser, setCurrentUser] = useState<InternalAccount | null>(() => {
+    if (typeof window !== 'undefined' && memoryStaffSession) return memoryStaffSession;
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem('memoria_staff_session');
+        if (stored) {
+          const parsed = JSON.parse(stored) as InternalAccount;
+          memoryStaffSession = parsed;
+          return parsed;
+        }
+      } catch {}
+    }
+    return null;
+  });
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      if (memoryStaffSession) return false;
+      try {
+        if (sessionStorage.getItem('memoria_staff_session')) return false;
+      } catch {}
+    }
+    return true;
+  });
 
   useEffect(() => {
     let active = true;
 
     // Fast-path from client session storage or memory cache
     try {
-      if (memoryStaffSession) {
+      if (memoryStaffSession && !currentUser) {
         setCurrentUser(memoryStaffSession);
         setLoading(false);
-      } else {
+      } else if (!currentUser) {
         const stored = sessionStorage.getItem('memoria_staff_session');
         if (stored) {
           const parsed = JSON.parse(stored) as InternalAccount;

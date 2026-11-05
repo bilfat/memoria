@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { InternalAccount, Role } from '@/types';
 import { revalidatePath } from 'next/cache';
+import { cache } from 'react';
 
 /**
  * loginAction
@@ -85,8 +86,9 @@ export async function logoutAction() {
 /**
  * getCurrentStaffSession
  * Memeriksa sesi saat ini dan mengembalikan profil staff aktif.
+ * Menggunakan React cache() untuk deduplikasi request dalam 1 siklus render.
  */
-export async function getCurrentStaffSession(): Promise<InternalAccount | null> {
+export const getCurrentStaffSession = cache(async function getCurrentStaffSession(): Promise<InternalAccount | null> {
   try {
     const supabase = await createClient();
     const { data: { user }, error } = await supabase.auth.getUser();
@@ -118,7 +120,7 @@ export async function getCurrentStaffSession(): Promise<InternalAccount | null> 
   } catch {
     return null;
   }
-}
+});
 
 /**
  * listAccountsAction (Admin Only)

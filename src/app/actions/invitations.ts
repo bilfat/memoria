@@ -164,7 +164,7 @@ export async function listLecturerInvitationsAction(params?: {
     const searchQuery = params?.searchQuery?.trim().toLowerCase() || '';
     const attendanceFilter = params?.filterAttendance || 'ALL';
 
-    // 1. Ambil data dosen
+    // 1. Eksekusi query data dosen dan riwayat check-in secara paralel
     let query = admin
       .from('lecturer_invitations')
       .select('*')
@@ -176,17 +176,20 @@ export async function listLecturerInvitationsAction(params?: {
       );
     }
 
-    const { data: lecturers, error: lecError } = await query;
+    const [lecturersRes, checkinsRes] = await Promise.all([
+      query,
+      admin
+        .from('checkins')
+        .select('lecturer_id, checked_at, method')
+        .not('lecturer_id', 'is', null),
+    ]);
+
+    const { data: lecturers, error: lecError } = lecturersRes;
     if (lecError) {
       return { success: false, lecturers: [], totalCount: 0, error: lecError.message };
     }
 
-    // 2. Ambil checkin records dosen
-    const { data: checkins } = await admin
-      .from('checkins')
-      .select('lecturer_id, checked_at, method')
-      .not('lecturer_id', 'is', null);
-
+    const checkins = checkinsRes.data;
     const checkinMap = new Map<string, { checked_at: string; method: string }>();
     if (checkins) {
       for (const c of checkins) {

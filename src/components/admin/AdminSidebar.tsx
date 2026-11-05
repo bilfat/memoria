@@ -105,6 +105,7 @@ export function AdminSidebar({ user, onLogout, onCloseMobile }: AdminSidebarProp
             <div key={item.label} className="space-y-0.5">
               <Link
                 href={item.href}
+                prefetch={true}
                 onClick={onCloseMobile}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${
                   isRootActive
@@ -125,6 +126,7 @@ export function AdminSidebar({ user, onLogout, onCloseMobile }: AdminSidebarProp
                       <Link
                         key={sub.href}
                         href={sub.href}
+                        prefetch={true}
                         onClick={onCloseMobile}
                         className={`block py-1.5 px-2 text-[11px] rounded transition-colors ${
                           isSubActive
