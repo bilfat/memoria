@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentStaffSession } from '@/app/actions/auth';
 import { formatWibDateTime } from '@/lib/date';
-import { sendBrevoTransactionalEmail, buildLecturerInvitationEmailHtml } from '@/lib/brevo';
+import { sendBrevoTransactionalEmail, buildLecturerInvitationEmailHtml, getEffectiveSiteUrl } from '@/lib/brevo';
 import { generateQrDataUrl } from '@/lib/qrCode';
 
 export interface InvitationTemplateDTO {
@@ -491,7 +491,7 @@ export async function enqueueLecturerEmailAction(lecturerId: string): Promise<{
       .eq('id', 1)
       .single();
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://memoria2026.com';
+    const siteUrl = getEffectiveSiteUrl();
     const inviteUrl = `${siteUrl}/undangan/${lecturer.public_token || lecturer.invitation_code}`;
     const template = (eventSettings?.invitation_template as any) || {};
     const subject = (template.subject || 'Undangan Kehormatan MEMORIA Diesnatalis 2026')

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { getTicketViewDataAction } from '@/app/actions/tickets';
 import type { TicketViewData } from '@/lib/ticketData';
 import { generateQrDataUrl } from '@/lib/qrCode';
@@ -20,8 +20,15 @@ import {
 } from '@phosphor-icons/react';
 
 function RegistrationSuccessContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
+
+  useEffect(() => {
+    if (token) {
+      router.replace(`/tiket/${encodeURIComponent(token)}?purchased=1`);
+    }
+  }, [token, router]);
 
   const [ticket, setTicket] = useState<TicketViewData | null>(null);
   const [loading, setLoading] = useState(true);

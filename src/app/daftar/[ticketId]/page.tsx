@@ -100,9 +100,9 @@ function TicketRegistrationContent({
         return;
       }
 
-      // Success: redirect to verified success page with live token
+      // Success: langsung arahkan ke halaman E-Ticket di web dengan notifikasi popup berhasil
       const token = json.data.ticketAccessToken;
-      router.push(`/daftar/berhasil?token=${encodeURIComponent(token)}`);
+      router.push(`/tiket/${encodeURIComponent(token)}?purchased=1`);
     } catch (err: any) {
       setErrorMessage(err.message || 'Terjadi gangguan jaringan saat mendaftar tiket.');
       setSubmitting(false);

@@ -2,7 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentStaffSession } from '@/app/actions/auth';
-import { processEmailJobsBatch, buildTicketEmailHtml, sendBrevoTransactionalEmail } from '@/lib/brevo';
+import { processEmailJobsBatch, buildTicketEmailHtml, sendBrevoTransactionalEmail, getEffectiveSiteUrl } from '@/lib/brevo';
 import { fetchTicketByAccessToken } from '@/lib/ticketData';
 import { generateTicketPdfBuffer } from '@/lib/ticketPdf';
 
@@ -50,7 +50,7 @@ export async function enqueueTicketResendAction(participantId: string): Promise<
     // 3. Generate PDF dan HTML email tiket
     const pdfBuffer = await generateTicketPdfBuffer(ticketData);
     const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://memoria2026.com';
+    const siteUrl = getEffectiveSiteUrl();
     const html = buildTicketEmailHtml(ticketData, siteUrl);
 
     // 4. Kirim LANGSUNG via Brevo Transactional Email

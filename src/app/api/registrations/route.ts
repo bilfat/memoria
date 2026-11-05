@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { participantRegistrationSchema } from '@/lib/validations';
+import { processEmailJobsBatch } from '@/lib/brevo';
 
 export async function POST(request: NextRequest) {
   try {
@@ -96,7 +97,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Sukses
+    // 5. Kirim email tiket secara instan di background worker
+    processEmailJobsBatch().catch((err) => {
+      console.error('[API Registrations] Trigger email jobs error:', err);
+    });
+
+    // 6. Sukses
     const ticketUrl = `/tiket/${rpcResult.ticketAccessToken}`;
 
     return NextResponse.json(

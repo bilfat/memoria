@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, use, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { getTicketViewDataAction } from '@/app/actions/tickets';
 import type { TicketViewData } from '@/lib/ticketData';
 import { createClient } from '@/lib/supabase/client';
@@ -20,6 +21,8 @@ import {
   MapPin,
   CalendarBlank,
   QrCode,
+  X,
+  EnvelopeSimple,
 } from '@phosphor-icons/react';
 
 function TicketViewContent({
@@ -29,12 +32,35 @@ function TicketViewContent({
 }) {
   const resolvedParams = use(params);
   const token = resolvedParams.token;
+  const searchParams = useSearchParams();
   const { success, error: toastError } = useToast();
 
   const [ticket, setTicket] = useState<TicketViewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [downloading, setDownloading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
+
+  // Deteksi jika diarahkan setelah berhasil membeli tiket (?purchased=1)
+  useEffect(() => {
+    if (searchParams.get('purchased') === '1') {
+      setShowSuccessModal(true);
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('purchased');
+        window.history.replaceState({}, '', url.pathname);
+      }
+    }
+  }, [searchParams]);
+
+  // Otomatis menutup popup sukses setelah 3.5 detik untuk langsung menampilkan e-ticket web
+  useEffect(() => {
+    if (!showSuccessModal) return;
+    const timer = setTimeout(() => {
+      setShowSuccessModal(false);
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [showSuccessModal]);
 
   useEffect(() => {
     let isMounted = true;
@@ -353,6 +379,139 @@ function TicketViewContent({
             <span>Salin Tautan</span>
           </button>
         </div>
+
+        {/* POPUP MODAL TIKET BERHASIL DIBELI (Tampil Otomatis Setelah Pendaftaran & Menutup Sendiri) */}
+        {showSuccessModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn print:hidden">
+            <div className="relative w-full max-w-md rounded-3xl bg-gradient-to-b from-[#2a070c] via-[#1a0407] to-[#120205] border-2 border-memoria-gold/70 p-6 sm:p-8 text-center shadow-[0_0_60px_rgba(214,180,106,0.35)] space-y-5 animate-scaleUp">
+              {/* Tombol Tutup */}
+              <button
+                type="button"
+                onClick={() => setShowSuccessModal(false)}
+                className="absolute top-4 right-4 p-1.5 rounded-full text-memoria-champagne/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Tutup Popup"
+              >
+                <X size={18} />
+              </button>
+
+              {/* Glowing Emerald Checkmark Icon */}
+              <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+                <div
+                  className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping"
+                  style={{ animationDuration: '2s' }}
+                />
+                <div className="absolute inset-1.5 rounded-full bg-gradient-to-tr from-emerald-950 via-emerald-900 to-teal-950 border border-emerald-400/60 shadow-inner" />
+                <svg
+                  className="relative w-14 h-14 text-emerald-400 drop-shadow-[0_4px_12px_rgba(16,185,129,0.5)]"
+                  viewBox="0 0 52 52"
+                  fill="none"
+                >
+                  <circle
+                    cx="26"
+                    cy="26"
+                    r="23"
+                    className="checkmark-circle-anim"
+                    stroke="#10B981"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M15 27.5L22.5 35L37.5 18"
+                    className="checkmark-check-anim"
+                    stroke="#34D399"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-bold tracking-widest uppercase text-emerald-400 bg-emerald-950/80 px-3 py-1 rounded-full border border-emerald-500/40 inline-block">
+                  Tiket Berhasil Dipesan!
+                </span>
+                <h3
+                  style={{ fontFamily: 'var(--font-bodoni), serif' }}
+                  className="text-2xl font-bold text-memoria-ivory mt-3"
+                >
+                  Selamat, {ticket.fullName}!
+                </h3>
+                <p className="text-xs text-memoria-champagne/80 mt-1">
+                  Kategori: <strong className="text-memoria-gold">{ticket.ticketTypeName}</strong> • No: <span className="font-mono text-white">{ticket.ticketNumber}</span>
+                </p>
+              </div>
+
+              {/* Notifikasi Otomatis Terkirim ke Email */}
+              <div className="p-3.5 rounded-xl bg-black/60 border border-memoria-gold/30 text-xs text-memoria-champagne/90 space-y-1 text-left">
+                <div className="flex items-center gap-2 text-emerald-400 font-semibold text-[11px]">
+                  <EnvelopeSimple size={15} weight="bold" />
+                  <span>E-Ticket & PDF Otomatis Dikirim ke Email</span>
+                </div>
+                <p className="text-[11px] text-neutral-300">
+                  Salinan tiket digital dan file PDF resmi telah otomatis dikirimkan ke alamat email <strong className="text-white font-mono">{ticket.email}</strong>.
+                </p>
+              </div>
+
+              {/* Countdown Progress Bar (Menutup otomatis dalam 3.5 detik) */}
+              <div className="space-y-1.5 pt-1">
+                <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-emerald-400 h-full rounded-full w-full"
+                    style={{
+                      animation: 'shrinkProgress 3.5s linear forwards',
+                    }}
+                  />
+                </div>
+                <p className="text-[10px] text-memoria-champagne/60 font-mono">
+                  Menutup otomatis dalam 3 detik untuk menampilkan E-Ticket web...
+                </p>
+              </div>
+
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setShowSuccessModal(false)}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-memoria-gold via-amber-300 to-memoria-gold text-neutral-950 font-bold text-xs uppercase tracking-wider shadow-lg hover:scale-101 active:scale-99 transition-all cursor-pointer"
+              >
+                Tampilkan E-Ticket Sekarang
+              </button>
+
+              <style jsx>{`
+                @keyframes shrinkProgress {
+                  from {
+                    width: 100%;
+                  }
+                  to {
+                    width: 0%;
+                  }
+                }
+                @keyframes strokeDraw {
+                  100% {
+                    stroke-dashoffset: 0;
+                  }
+                }
+                @keyframes checkMarkDraw {
+                  0% {
+                    stroke-dashoffset: 45;
+                  }
+                  100% {
+                    stroke-dashoffset: 0;
+                  }
+                }
+                :global(.checkmark-circle-anim) {
+                  stroke-dasharray: 150;
+                  stroke-dashoffset: 150;
+                  animation: strokeDraw 0.5s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+                }
+                :global(.checkmark-check-anim) {
+                  stroke-dasharray: 45;
+                  stroke-dashoffset: 45;
+                  animation: checkMarkDraw 0.4s 0.35s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+                }
+              `}</style>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

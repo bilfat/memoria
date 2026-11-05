@@ -98,11 +98,26 @@ export async function sendBrevoTransactionalEmail(
 }
 
 /**
+ * Mengembalikan Base URL website yang valid dan dapat diakses dari internet.
+ * Jika NEXT_PUBLIC_SITE_URL berisi localhost / 127.0.0.1 atau tidak terdefinisi,
+ * otomatis dialihkan ke domain publik Vercel resmi (https://memoria-sikc.vercel.app)
+ * agar tombol tiket dan tautan di dalam email selalu dapat dibuka di smartphone penerima.
+ */
+export function getEffectiveSiteUrl(customUrl?: string): string {
+  const urlCandidate = (customUrl || process.env.NEXT_PUBLIC_SITE_URL || '').trim();
+  if (urlCandidate && !urlCandidate.includes('localhost') && !urlCandidate.includes('127.0.0.1')) {
+    return urlCandidate.replace(/\/$/, '');
+  }
+  return 'https://memoria-sikc.vercel.app';
+}
+
+/**
  * Template HTML email e-ticket mahasiswa (Ultra Compact, No Scroll, High Contrast).
  * Memuat data penting saja dan QR Code kecil yang presisi tanpa warna font yang bertabrakan.
  */
-export function buildTicketEmailHtml(ticket: TicketViewData, siteUrl: string): string {
-  const eTicketUrl = `${siteUrl}/tiket/${ticket.ticketAccessToken}`;
+export function buildTicketEmailHtml(ticket: TicketViewData, siteUrl?: string): string {
+  const effectiveBaseUrl = getEffectiveSiteUrl(siteUrl);
+  const eTicketUrl = `${effectiveBaseUrl}/tiket/${ticket.ticketAccessToken}`;
   const formattedDate = formatWibDateTime(ticket.eventStartAt);
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(ticket.qrToken)}&margin=2`;
 
@@ -373,7 +388,7 @@ export async function processEmailJobsBatch(batchSize = 10): Promise<{
   error?: string;
 }> {
   const admin = createAdminClient();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const siteUrl = getEffectiveSiteUrl();
 
   let claimedJobs: any[] = [];
 

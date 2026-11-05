@@ -35,12 +35,17 @@ export async function fetchTicketByAccessToken(token: string): Promise<TicketVie
   try {
     const admin = createAdminClient();
 
-    // 1. Ambil data peserta berdasarkan ticket_access_token, qr_token, atau id
+    // 1. Ambil data peserta berdasarkan ticket_access_token, qr_token, atau id (jika UUID valid)
     const cleanToken = token.trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanToken);
+    const orFilter = isUuid
+      ? `ticket_access_token.eq.${cleanToken},qr_token.eq.${cleanToken},id.eq.${cleanToken}`
+      : `ticket_access_token.eq.${cleanToken},qr_token.eq.${cleanToken}`;
+
     const { data: participant, error: partError } = await admin
       .from('participants')
       .select('id, full_name, nim, study_program, faculty, phone, email, ticket_number, ticket_type_id, ticket_access_token, qr_token, status, created_at')
-      .or(`ticket_access_token.eq.${cleanToken},qr_token.eq.${cleanToken},id.eq.${cleanToken}`)
+      .or(orFilter)
       .limit(1)
       .maybeSingle();
 
