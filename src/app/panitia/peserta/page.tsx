@@ -17,6 +17,7 @@ import { createClient } from '@/lib/supabase/client';
 import { enqueueTicketResendAction } from '@/app/actions/emails';
 import { TELKOM_FACULTIES, TelkomFaculty } from '@/lib/validations';
 import { formatWibDateTime, formatWibTimeOnly } from '@/lib/date';
+import { generateQrDataUrl } from '@/lib/qrCode';
 import { useToast } from '@/components/ui/Toast';
 import {
   FileXls,
@@ -34,6 +35,10 @@ import {
   Warning,
   ArrowUUpLeft,
   Trash,
+  QrCode,
+  ArrowSquareOut,
+  Copy,
+  Check,
 } from '@phosphor-icons/react';
 
 function ParticipantsContent() {
@@ -56,6 +61,12 @@ function ParticipantsContent() {
   const [selectedTicketFilter, setSelectedTicketFilter] = useState(initialTicketFilter);
   const [attendanceFilter, setAttendanceFilter] = useState<'ALL' | 'HADIR' | 'BELUM'>('ALL');
 
+  // Detail Modal (Pop-up Data Lengkap & QR Code)
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<ParticipantListItemDTO | null>(null);
+  const [detailQrDataUrl, setDetailQrDataUrl] = useState<string>('');
+  const [copiedTicketLink, setCopiedTicketLink] = useState(false);
+
   // Two-step Edit Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editStep, setEditStep] = useState<1 | 2>(1);
@@ -68,6 +79,7 @@ function ParticipantsContent() {
     phone: '',
     email: '',
     ticketTypeId: '',
+    hasCheckedIn: false,
   });
   const [adminPasswordConfirm, setAdminPasswordConfirm] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
@@ -232,6 +244,29 @@ function ParticipantsContent() {
     }
   };
 
+  // Detail Modal Handlers
+  const handleOpenDetail = (p: ParticipantListItemDTO) => {
+    setDetailTarget(p);
+    setDetailQrDataUrl('');
+    setCopiedTicketLink(false);
+    setDetailModalOpen(true);
+
+    const tokenToEncode = p.qrToken || p.ticketNumber || p.ticketAccessToken;
+    if (tokenToEncode) {
+      generateQrDataUrl(tokenToEncode).then((url) => {
+        setDetailQrDataUrl(url);
+      });
+    }
+  };
+
+  const handleCopyTicketLink = (token: string) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const url = `${origin}/tiket/${token}`;
+    navigator.clipboard.writeText(url);
+    setCopiedTicketLink(true);
+    setTimeout(() => setCopiedTicketLink(false), 2500);
+  };
+
   // Two-step Edit Handlers
   const handleOpenEdit = (p: ParticipantListItemDTO) => {
     setEditingTarget(p);
@@ -243,6 +278,7 @@ function ParticipantsContent() {
       phone: p.phone,
       email: p.email,
       ticketTypeId: p.ticketTypeId,
+      hasCheckedIn: p.hasCheckedIn,
     });
     setEditStep(1);
     setAdminPasswordConfirm('');
@@ -566,13 +602,14 @@ function ParticipantsContent() {
                         </td>
                         <td className="py-3.5 px-4 text-right">
                           <div className="inline-flex items-center gap-1">
-                            <Link
-                              href={`/panitia/peserta/${p.id}`}
-                              className="p-1.5 rounded-md hover:bg-[#E5E7EB] text-[#4B5563] transition-colors"
-                              title="Lihat Detail Peserta"
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDetail(p)}
+                              className="p-1.5 rounded-md hover:bg-[#E5E7EB] text-[#4B5563] transition-colors cursor-pointer"
+                              title="Lihat Detail Lengkap & QR Code Peserta"
                             >
                               <Eye size={15} />
-                            </Link>
+                            </button>
                             <button
                               onClick={() => handleResendEmail(p)}
                               disabled={sendingParticipantId === p.id}
@@ -656,6 +693,233 @@ function ParticipantsContent() {
           )}
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* POP-UP DETAIL LENGKAP & QR CODE PESERTA */}
+      {/* ========================================================================= */}
+      {detailModalOpen && detailTarget && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5 text-xs animate-in fade-in zoom-in-95 duration-150 my-8">
+            {/* Header Modal */}
+            <div className="flex items-start justify-between border-b border-[#E5E7EB] pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-base text-[#1F2937]">Detail Lengkap Peserta</h3>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      detailTarget.status === 'active'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-rose-50 text-rose-700 border border-rose-200'
+                    }`}
+                  >
+                    {detailTarget.status === 'active' ? 'Aktif' : 'Diarsipkan'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#6B7280] mt-0.5">
+                  Informasi pendaftaran dan kode QR resmi tiket mahasiswa
+                </p>
+              </div>
+              <button
+                onClick={() => setDetailModalOpen(false)}
+                className="p-1.5 rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] transition-colors"
+                title="Tutup Modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Grid Konten: QR Card & Detail */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+              {/* Kolom QR Code */}
+              <div className="md:col-span-5 flex flex-col items-center justify-between p-4 bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] text-center">
+                <div className="w-full flex flex-col items-center">
+                  <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-2">
+                    QR Presensi Tiket
+                  </span>
+
+                  <div className="w-40 h-40 bg-white p-2 rounded-xl shadow-xs border border-gray-200 flex items-center justify-center overflow-hidden">
+                    {detailQrDataUrl ? (
+                      <img
+                        src={detailQrDataUrl}
+                        alt={`QR Code ${detailTarget.ticketNumber}`}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center text-gray-400 gap-1">
+                        <QrCode size={36} className="animate-pulse" />
+                        <span className="text-[10px]">Membuat QR...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-3">
+                    <span className="font-mono font-bold text-sm text-[#1F2937] block">
+                      {detailTarget.ticketNumber}
+                    </span>
+                    <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#891523]/10 text-[#891523]">
+                      {detailTarget.ticketTypeName}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tombol Akses E-Tiket */}
+                <div className="w-full mt-4 space-y-2 pt-3 border-t border-[#E5E7EB]">
+                  <a
+                    href={`/tiket/${detailTarget.ticketAccessToken}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-1.5 px-3 rounded-lg bg-white border border-[#D1D5DB] text-[#374151] hover:bg-[#F3F4F6] font-medium flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <span>Buka E-Ticket</span>
+                    <ArrowSquareOut size={13} />
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCopyTicketLink(detailTarget.ticketAccessToken)}
+                    className="w-full py-1.5 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-[#4B5563] font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    {copiedTicketLink ? (
+                      <>
+                        <Check size={13} className="text-emerald-600" />
+                        <span className="text-emerald-700 font-semibold">Tersalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={13} />
+                        <span>Salin Link Tiket</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Kolom Informasi Detail */}
+              <div className="md:col-span-7 space-y-3.5">
+                {/* Status Kehadiran Banner */}
+                <div
+                  className={`p-3 rounded-xl border flex items-center justify-between ${
+                    detailTarget.hasCheckedIn
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                      : 'bg-amber-50 border-amber-200 text-amber-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    {detailTarget.hasCheckedIn ? (
+                      <CheckCircle size={24} weight="fill" className="text-emerald-600 shrink-0" />
+                    ) : (
+                      <Clock size={24} className="text-amber-600 shrink-0" />
+                    )}
+                    <div>
+                      <div className="font-bold text-xs">
+                        {detailTarget.hasCheckedIn ? 'Sudah Hadir (Check-in)' : 'Belum Hadir'}
+                      </div>
+                      <div className="text-[10px] opacity-80">
+                        {detailTarget.hasCheckedIn
+                          ? `WIB: ${formatWibDateTime(detailTarget.checkedInAt || '')} (${
+                              detailTarget.checkinMethod === 'qr'
+                                ? 'Scan Kamera QR'
+                                : detailTarget.checkinMethod === 'manual'
+                                ? 'Manual Panitia'
+                                : detailTarget.checkinMethod || 'Presensi'
+                            })`
+                          : 'Belum melakukan pemindaian barcode presensi'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Identitas Mahasiswa */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider block">
+                    Identitas Mahasiswa
+                  </span>
+                  <div className="bg-[#F9FAFB] p-3 rounded-xl border border-[#E5E7EB] space-y-1.5">
+                    <div className="flex justify-between items-center pb-1.5 border-b border-gray-200">
+                      <span className="text-gray-500">Nama Lengkap</span>
+                      <span className="font-bold text-[#1F2937] text-right">{detailTarget.fullName}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-1.5 border-b border-gray-200">
+                      <span className="text-gray-500">NIM</span>
+                      <span className="font-mono font-semibold text-[#1F2937]">{detailTarget.nim}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-1.5 border-b border-gray-200">
+                      <span className="text-gray-500">Program Studi</span>
+                      <span className="font-medium text-[#1F2937] text-right">{detailTarget.studyProgram}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">Fakultas</span>
+                      <span className="font-medium text-[#1F2937] text-right">{detailTarget.faculty}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Kontak & Registrasi */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider block">
+                    Kontak & Registrasi
+                  </span>
+                  <div className="bg-[#F9FAFB] p-3 rounded-xl border border-[#E5E7EB] space-y-1.5">
+                    <div className="flex justify-between items-center pb-1.5 border-b border-gray-200">
+                      <span className="text-gray-500">Email</span>
+                      <span className="font-medium text-[#1F2937] text-right break-all">{detailTarget.email}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-1.5 border-b border-gray-200">
+                      <span className="text-gray-500">WhatsApp / No. HP</span>
+                      <span className="font-mono font-medium text-[#1F2937]">{detailTarget.phone}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">Waktu Pendaftaran</span>
+                      <span className="font-medium text-[#1F2937] text-right">
+                        {formatWibDateTime(detailTarget.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#E5E7EB]">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleResendEmail(detailTarget);
+                  }}
+                  disabled={sendingParticipantId === detailTarget.id}
+                  className="px-3 py-2 rounded-lg border border-[#D1D5DB] text-[#374151] hover:bg-[#F3F4F6] font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <EnvelopeSimple size={14} />
+                  <span>
+                    {sendingParticipantId === detailTarget.id ? 'Mengirim...' : 'Kirim Ulang Tiket Email'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetailModalOpen(false);
+                    handleOpenEdit(detailTarget);
+                  }}
+                  className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-[#374151] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <PencilSimple size={14} />
+                  <span>Edit Data</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDetailModalOpen(false)}
+                className="px-5 py-2 rounded-lg bg-[#891523] text-white font-semibold hover:bg-[#720e1a] transition-colors cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 2-STEP EDIT MODAL */}
@@ -773,6 +1037,45 @@ function ParticipantsContent() {
                   </div>
                 </div>
 
+                {/* Status Kehadiran Presensi */}
+                <div>
+                  <label className="block font-semibold text-[#374151] mb-1.5">
+                    Status Kehadiran Presensi *
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, hasCheckedIn: false })}
+                      className={`px-3 py-2 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                        !editForm.hasCheckedIn
+                          ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-xs ring-1 ring-amber-300'
+                          : 'bg-white border-[#D1D5DB] text-[#6B7280] hover:bg-gray-50'
+                      }`}
+                    >
+                      <Clock size={15} />
+                      <span>Belum Hadir</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, hasCheckedIn: true })}
+                      className={`px-3 py-2 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                        editForm.hasCheckedIn
+                          ? 'bg-emerald-50 border-emerald-400 text-emerald-800 shadow-xs ring-1 ring-emerald-400'
+                          : 'bg-white border-[#D1D5DB] text-[#6B7280] hover:bg-gray-50'
+                      }`}
+                    >
+                      <CheckCircle size={15} weight="fill" />
+                      <span>Sudah Hadir (Check-in)</span>
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-[#6B7280] block mt-1">
+                    {editForm.hasCheckedIn
+                      ? '✓ Peserta akan dicatat presensi hadir di sistem database.'
+                      : 'Peserta belum presensi atau catatan kehadiran sebelumnya akan dihapus.'}
+                  </span>
+                </div>
+
                 <div className="pt-3 flex justify-end gap-2 border-t border-[#E5E7EB]">
                   <button
                     type="button"
@@ -798,6 +1101,17 @@ function ParticipantsContent() {
                   </p>
                   <p>
                     Prodi: {editForm.studyProgram} ({editForm.faculty})
+                  </p>
+                  <p>
+                    Status Kehadiran:{' '}
+                    <strong className={editForm.hasCheckedIn ? 'text-emerald-700' : 'text-amber-800'}>
+                      {editForm.hasCheckedIn ? 'Sudah Hadir (Check-in)' : 'Belum Hadir'}
+                    </strong>
+                    {editingTarget && editingTarget.hasCheckedIn !== editForm.hasCheckedIn && (
+                      <span className="text-xs text-[#891523] font-bold ml-1.5">
+                        (Berubah dari: {editingTarget.hasCheckedIn ? 'Sudah Hadir' : 'Belum Hadir'})
+                      </span>
+                    )}
                   </p>
                 </div>
 

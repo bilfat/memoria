@@ -225,9 +225,9 @@ export function CameraQrScanner({ onScan, isProcessing = false }: CameraQrScanne
             // Bunyikan Audio Beep scanner kasir instan pada milidetik QR terbaca
             playBeepSound();
 
-            setTimeout(() => setScanFlash(false), 300);
+            setTimeout(() => setScanFlash(false), 200);
 
-            // Teruskan token hasil scan ke parent handler
+            // Teruskan token hasil scan seketika ke handler presensi
             onScan(code.data);
           }
         }
@@ -305,21 +305,20 @@ export function CameraQrScanner({ onScan, isProcessing = false }: CameraQrScanne
         />
         <canvas ref={canvasRef} className="hidden" />
 
-        {/* Scan Success Green Flash Overlay */}
+        {/* Flash Hijau Halus saat QR Berhasil Terdeteksi */}
         {scanFlash && (
-          <div className="absolute inset-0 bg-emerald-500/35 border-4 border-emerald-400 z-30 pointer-events-none animate-pulse flex items-center justify-center">
-            <div className="px-4 py-2 rounded-full bg-emerald-950/90 border border-emerald-400 text-emerald-300 text-xs font-bold tracking-wider flex items-center gap-2 shadow-2xl">
-              <CheckCircle size={18} weight="fill" className="text-emerald-400" />
-              <span>QR CODE TERDETEKSI!</span>
-            </div>
-          </div>
+          <div className="absolute inset-0 bg-emerald-500/15 border-2 border-emerald-400 z-30 pointer-events-none transition-opacity duration-150" />
         )}
 
         {/* Viewfinder Reticle / Target Area saat kamera aktif */}
         {isCameraActive && (
           <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-6 z-20">
             {/* Target Reticle Box */}
-            <div className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-2xl border-2 border-white/20 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]">
+            <div
+              className={`relative w-56 h-56 sm:w-64 sm:h-64 rounded-2xl border-2 transition-all duration-150 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] ${
+                scanFlash ? 'border-emerald-400 ring-4 ring-emerald-400/40' : 'border-white/20'
+              }`}
+            >
               {/* Corner Brackets */}
               <div className="absolute -top-1 -left-1 w-7 h-7 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg" />
               <div className="absolute -top-1 -right-1 w-7 h-7 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg" />
@@ -335,17 +334,10 @@ export function CameraQrScanner({ onScan, isProcessing = false }: CameraQrScanne
               />
             </div>
 
-            {/* Instruction Overlay or Processing Badge */}
-            {isProcessing ? (
-              <span className="mt-4 px-4 py-1.5 rounded-full bg-emerald-950/90 backdrop-blur-md text-[11px] font-bold tracking-wider text-emerald-300 border border-emerald-400 shadow-xl flex items-center gap-2 animate-pulse">
-                <ArrowsClockwise size={14} className="animate-spin text-emerald-400" />
-                <span>MEMVERIFIKASI PRESENSI...</span>
-              </span>
-            ) : (
-              <span className="mt-4 px-3.5 py-1 rounded-full bg-black/75 backdrop-blur-md text-[11px] font-mono tracking-wider text-emerald-300 border border-emerald-500/40 shadow-lg">
-                ARAHKAN KE QR CODE TIKET / UNDANGAN
-              </span>
-            )}
+            {/* Instruction Overlay */}
+            <span className="mt-4 px-3.5 py-1 rounded-full bg-black/75 backdrop-blur-md text-[11px] font-mono tracking-wider text-emerald-300 border border-emerald-500/40 shadow-lg">
+              ARAHKAN KE QR CODE TIKET / UNDANGAN
+            </span>
           </div>
         )}
 

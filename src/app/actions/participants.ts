@@ -17,6 +17,7 @@ export interface ParticipantListItemDTO {
   ticketTypeName: string;
   ticketNumber: string;
   ticketAccessToken: string;
+  qrToken?: string;
   status: 'active' | 'archived';
   archivedAt: string | null;
   createdAt: string;
@@ -75,7 +76,7 @@ export async function listAdminParticipantsAction(params: {
     // 1. Bangun query dasar peserta sesuai tab
     let query = admin
       .from('participants')
-      .select('id, full_name, nim, study_program, faculty, phone, email, ticket_type_id, ticket_number, ticket_access_token, status, archived_at, created_at')
+      .select('id, full_name, nim, study_program, faculty, phone, email, ticket_type_id, ticket_number, ticket_access_token, qr_token, status, archived_at, created_at')
       .eq('status', tab);
 
     if (ticketFilter) {
@@ -157,6 +158,7 @@ export async function listAdminParticipantsAction(params: {
         ticketTypeName: ticketMap.get(p.ticket_type_id) || 'Standard Ticket',
         ticketNumber: p.ticket_number,
         ticketAccessToken: p.ticket_access_token,
+        qrToken: p.qr_token || '',
         status: p.status as 'active' | 'archived',
         archivedAt: p.archived_at,
         createdAt: p.created_at,
@@ -220,7 +222,7 @@ export async function getAdminParticipantDetailAction(id: string): Promise<{
 
     const { data: p, error: partError } = await admin
       .from('participants')
-      .select('id, full_name, nim, study_program, faculty, phone, email, ticket_type_id, ticket_number, ticket_access_token, status, archived_at, created_at')
+      .select('id, full_name, nim, study_program, faculty, phone, email, ticket_type_id, ticket_number, ticket_access_token, qr_token, status, archived_at, created_at')
       .eq('id', id)
       .single();
 
@@ -254,6 +256,7 @@ export async function getAdminParticipantDetailAction(id: string): Promise<{
         ticketTypeName: ticketType?.name || 'Standard Pass',
         ticketNumber: p.ticket_number,
         ticketAccessToken: p.ticket_access_token,
+        qrToken: p.qr_token || '',
         status: p.status as 'active' | 'archived',
         archivedAt: p.archived_at,
         createdAt: p.created_at,
@@ -300,6 +303,7 @@ export async function updateParticipantAction(
     phone: string;
     email: string;
     ticketTypeId: string;
+    hasCheckedIn?: boolean;
   },
   adminPasswordConfirm: string
 ): Promise<{ success: boolean; error?: string }> {
@@ -390,7 +394,7 @@ export async function updateParticipantAction(
       .update({
         full_name: data.fullName.trim(),
         nim: cleanNim,
-        studyProgram: data.studyProgram.trim(),
+        study_program: data.studyProgram.trim(),
         faculty: data.faculty,
         phone: data.phone.trim(),
         email: data.email.trim().toLowerCase(),
@@ -401,6 +405,37 @@ export async function updateParticipantAction(
 
     if (updateError) {
       return { success: false, error: updateError.message };
+    }
+
+    // 6b. Sinkronisasi status kehadiran jika ditentukan oleh admin
+    if (typeof data.hasCheckedIn === 'boolean') {
+      const { data: existingCheckin } = await admin
+        .from('checkins')
+        .select('id')
+        .eq('participant_id', participantId)
+        .maybeSingle();
+
+      if (data.hasCheckedIn && !existingCheckin) {
+        // Catat check-in manual oleh panitia/admin
+        const { error: insCheckinErr } = await admin.from('checkins').insert({
+          participant_id: participantId,
+          checked_at: new Date().toISOString(),
+          method: 'manual',
+          checked_by: session.id,
+        });
+        if (insCheckinErr) {
+          console.error('[updateParticipantAction] Error inserting checkin:', insCheckinErr);
+        }
+      } else if (!data.hasCheckedIn && existingCheckin) {
+        // Batalkan kehadiran
+        const { error: delCheckinErr } = await admin
+          .from('checkins')
+          .delete()
+          .eq('participant_id', participantId);
+        if (delCheckinErr) {
+          console.error('[updateParticipantAction] Error deleting checkin:', delCheckinErr);
+        }
+      }
     }
 
     // 7. Catat ke audit_logs
@@ -414,10 +449,13 @@ export async function updateParticipantAction(
         newNim: cleanNim,
         oldTicketTypeId: existing.ticket_type_id,
         newTicketTypeId: data.ticketTypeId,
+        hasCheckedIn: data.hasCheckedIn,
       },
     });
 
     revalidatePath('/panitia/peserta');
+    revalidatePath('/panitia/check-in');
+    revalidatePath('/panitia/dashboard');
     revalidatePath(`/panitia/peserta/${participantId}`);
     return { success: true };
   } catch (err: any) {

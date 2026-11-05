@@ -188,7 +188,50 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 1A. Cari di tabel participants berdasarkan qr_token
+      // ⚡ JALUR ULTRA-CEPAT: Atomic 1-Step RPC Langsung di PostgreSQL (<10ms)
+      // Menghilangkan jeda verifikasi dan round-trip bertingkat antar server
+      if (body.autoConfirm) {
+        const normalizedMethod = (body.method || 'qr').toLowerCase().includes('manual') ? 'manual' : 'qr';
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('scan_qr_checkin', {
+          p_qr_token: token,
+          p_method: normalizedMethod,
+          p_staff_id: staff.id,
+        });
+
+        if (rpcErr) {
+          console.error('[checkins/resolve] scan_qr_checkin RPC error:', rpcErr);
+          return NextResponse.json(
+            { success: false, error: 'DATABASE_QUERY_FAILED', message: rpcErr.message || 'Gagal memproses presensi QR.' },
+            { status: 500 }
+          );
+        }
+
+        if (!rpcRes?.success) {
+          return NextResponse.json(
+            { success: false, error: rpcRes?.error || 'NOT_FOUND', message: rpcRes?.message || 'QR Code tidak terdaftar pada sistem.' },
+            { status: 400 }
+          );
+        }
+
+        // Catat ke audit log secara non-blocking di background
+        Promise.resolve(
+          supabase.from('audit_logs').insert({
+            actor_id: staff.id,
+            action: rpcRes.outcome === 'CREATED' ? 'CHECKIN_CONFIRM_SUCCESS' : 'CHECKIN_ALREADY_RECORDED',
+            entity_type: rpcRes.attendee?.targetType === 'PARTICIPANT' ? 'participants' : 'lecturer_invitations',
+            entity_id: rpcRes.attendee?.id,
+            details: {
+              outcome: rpcRes.outcome,
+              method: normalizedMethod,
+              operatorName: staff.fullName,
+            },
+          })
+        ).catch(() => {});
+
+        return NextResponse.json(rpcRes);
+      }
+
+      // 1A. Cari di tabel participants berdasarkan qr_token (untuk mode manual tanpa autoConfirm)
       const { data: participant, error: partError } = await supabase
         .from('participants')
         .select(`
