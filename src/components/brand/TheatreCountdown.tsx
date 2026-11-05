@@ -62,7 +62,7 @@ const MarqueeBulbBox = React.memo(function MarqueeBulbBox({
   boxId: string;
 }) {
   return (
-    <div className="marquee-countdown-box relative w-[88px] xs:w-[98px] sm:w-20 md:w-24 lg:w-28 aspect-[1/1.08] flex items-center justify-center select-none group shrink-0">
+    <div className="marquee-countdown-box relative w-[54px] xs:w-[62px] sm:w-[74px] md:w-[86px] lg:w-[98px] aspect-[1/1.08] flex items-center justify-center select-none group shrink-0">
       {/* SVG Canvas for Marquee Bulbs & Glowing Metallic Theatre Frame */}
       <svg
         viewBox="0 0 160 175"
@@ -164,17 +164,17 @@ const MarqueeBulbBox = React.memo(function MarqueeBulbBox({
       </svg>
 
       {/* Box Inner Editorial Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center text-center px-1">
+      <div className="relative z-10 flex flex-col items-center justify-center text-center px-0.5 sm:px-1">
         {/* Large Countdown Digits */}
         <span
           style={{ fontFamily: 'var(--font-bodoni), Georgia, serif' }}
-          className="text-2xl xs:text-[27px] sm:text-2xl md:text-3xl lg:text-4xl font-bold text-[#fffaf0] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] tracking-tight tabular-nums leading-none"
+          className="text-base xs:text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-[#fffaf0] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] tracking-tight tabular-nums leading-none"
         >
           {String(value).padStart(2, '0')}
         </span>
 
         {/* Gold Diamond Ornament Divider Line */}
-        <div className="w-7 xs:w-8 sm:w-8 md:w-12 my-0.5 sm:my-1.5 relative flex items-center justify-center">
+        <div className="w-4 xs:w-6 sm:w-8 md:w-11 my-0.5 sm:my-1 relative flex items-center justify-center">
           <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-[#d4af37] to-transparent opacity-80" />
           <div className="absolute w-1 xs:w-1.5 sm:w-1.5 rotate-45 bg-[#fef08a] border border-[#a16207] shadow-[0_0_5px_rgba(250,204,21,0.85)]" />
         </div>
@@ -182,7 +182,7 @@ const MarqueeBulbBox = React.memo(function MarqueeBulbBox({
         {/* Label: DAYS, HOURS, MINUTES, SECONDS */}
         <span
           style={{ fontFamily: 'var(--font-bodoni), serif' }}
-          className="text-[8px] xs:text-[9px] sm:text-[7.5px] md:text-[9px] font-semibold tracking-[0.16em] sm:tracking-[0.2em] text-[#ebd5aa] uppercase drop-shadow-sm"
+          className="text-[6px] xs:text-[7.5px] sm:text-[8px] md:text-[9.5px] font-semibold tracking-[0.12em] sm:tracking-[0.2em] text-[#ebd5aa] uppercase drop-shadow-sm"
         >
           {label}
         </span>
@@ -217,10 +217,18 @@ const StarSparkleDivider = React.memo(function StarSparkleDivider() {
 });
 
 export function TheatreCountdown({ countdown }: TheatreCountdownProps) {
-  if (countdown.isPast) {
+  if (countdown.status === 'ENDED') {
+    return (
+      <div className="py-2.5 px-6 rounded-full bg-gradient-to-r from-neutral-800 to-neutral-900 text-memoria-ivory font-bold text-xs sm:text-sm tracking-widest border border-memoria-gold/30 shadow-2xl">
+        RANGKAIAN ACARA TELAH SELESAI
+      </div>
+    );
+  }
+
+  if (countdown.status === 'HAPPENING' || countdown.isPast) {
     return (
       <div className="py-2.5 px-6 rounded-full bg-gradient-to-r from-memoria-burgundy to-memoria-stage-red text-memoria-ivory font-bold text-xs sm:text-sm tracking-widest border border-memoria-gold/50 shadow-2xl animate-pulse">
-        PERTUNJUKAN TEATER TELAH DIMULAI
+        PERTUNJUKAN TEATER SEDANG BERLANGSUNG
       </div>
     );
   }
@@ -233,23 +241,13 @@ export function TheatreCountdown({ countdown }: TheatreCountdownProps) {
   ];
 
   return (
-    <div className="w-full flex justify-center">
-      {/* 1. Mobile Layout: 2x2 Grid (1 1 / 1 1) dengan Angka Besar Jelas */}
-      <div className="grid grid-cols-2 gap-2.5 xs:gap-3.5 sm:hidden justify-items-center">
-        {units.map((unit) => (
-          <MarqueeBulbBox key={unit.id} value={unit.val} label={unit.label} boxId={unit.id} />
-        ))}
-      </div>
-
-      {/* 2. Tablet & Desktop Layout: 4 Horizontal Boxes with Star Sparkle Dividers */}
-      <div className="hidden sm:flex items-center justify-center gap-1 sm:gap-2 md:gap-3">
-        {units.map((unit, index) => (
-          <React.Fragment key={unit.id}>
-            <MarqueeBulbBox value={unit.val} label={unit.label} boxId={unit.id} />
-            {index < units.length - 1 && <StarSparkleDivider />}
-          </React.Fragment>
-        ))}
-      </div>
+    <div className="w-full flex items-center justify-center gap-1 xs:gap-1.5 sm:gap-2.5 md:gap-3.5 px-1">
+      {units.map((unit, index) => (
+        <React.Fragment key={unit.id}>
+          <MarqueeBulbBox value={unit.val} label={unit.label} boxId={unit.id} />
+          {index < units.length - 1 && <StarSparkleDivider />}
+        </React.Fragment>
+      ))}
     </div>
   );
 }

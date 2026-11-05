@@ -3,20 +3,19 @@
 import React from 'react';
 import Link from 'next/link';
 import { InternalAccount } from '@/types';
-import { List, ArrowSquareOut, Swap } from '@phosphor-icons/react';
+import { List, ArrowSquareOut } from '@phosphor-icons/react';
 
 interface AdminTopbarProps {
   user: InternalAccount | null;
   title?: string;
   onOpenMobile: () => void;
-  onSwitchRole: () => void;
+  onSwitchRole?: () => void;
 }
 
 export function AdminTopbar({
   user,
   title = 'Dashboard Panel',
   onOpenMobile,
-  onSwitchRole,
 }: AdminTopbarProps) {
   const isAdmin = user?.role === 'ADMIN_PANITIA';
 
@@ -36,18 +35,13 @@ export function AdminTopbar({
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Demo Fast Role Switcher */}
-        <button
-          onClick={onSwitchRole}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] hover:bg-[#F3F4F6] text-xs text-[#374151] font-medium transition-colors"
-          title="Beralih peran demo antara Admin Panitia dan Petugas Check-in"
-        >
-          <Swap size={15} className="text-[#891523]" />
-          <span className="hidden sm:inline">Ganti Role:</span>
+        {/* User Role Badge (Real from session, no fake switcher) */}
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] text-xs text-[#374151] font-medium">
+          <span className="hidden sm:inline">Peran:</span>
           <span className="font-bold text-[#891523]">
-            {isAdmin ? 'Admin' : 'Petugas'}
+            {isAdmin ? 'Admin Panitia' : 'Petugas Check-in'}
           </span>
-        </button>
+        </div>
 
         {/* Link to Public Website */}
         <Link

@@ -1,55 +1,70 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { useEffect, useState, useTransition, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { participantAdapter, ticketAdapter, votingAdapter, checkinAdapter } from '@/data/adapters';
-import { mockStore } from '@/data/mock/mockStore';
-import { Participant, TicketType, TicketIdentity, Voting, CheckinRecord, VoteRecord } from '@/types';
-import { exportParticipantsToXlsx } from '@/lib/xlsxExport';
-import { formatWibDateTime } from '@/lib/date';
+import {
+  listAdminParticipantsAction,
+  updateParticipantAction,
+  archiveParticipantAction,
+  restoreParticipantAction,
+  ParticipantListItemDTO,
+} from '@/app/actions/participants';
+import { listAdminTicketsAction, TicketTypeAdminDTO } from '@/app/actions/tickets';
+import { createClient } from '@/lib/supabase/client';
+import { enqueueTicketResendAction } from '@/app/actions/emails';
+import { TELKOM_FACULTIES, TelkomFaculty } from '@/lib/validations';
+import { formatWibDateTime, formatWibTimeOnly } from '@/lib/date';
 import { useToast } from '@/components/ui/Toast';
 import {
   FileXls,
   MagnifyingGlass,
   Funnel,
   PencilSimple,
-  Trash,
+  Archive,
   ArrowClockwise,
   EnvelopeSimple,
   Eye,
   CheckCircle,
-  WarningCircle,
+  Clock,
   X,
   Lock,
+  Warning,
+  ArrowUUpLeft,
 } from '@phosphor-icons/react';
 
 function ParticipantsContent() {
   const searchParams = useSearchParams();
-  const filterTicketId = searchParams.get('ticketId') || '';
+  const initialTicketFilter = searchParams.get('ticketId') || '';
 
-  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'ARCHIVED'>('ACTIVE');
-  const [participants, setParticipants] = useState<Participant[]>(mockStore.getParticipants());
-  const [tickets, setTickets] = useState<TicketType[]>(mockStore.getTickets());
-  const [votings, setVotings] = useState<Voting[]>(mockStore.getVotings());
-  const [checkins, setCheckins] = useState<CheckinRecord[]>(mockStore.getCheckinRecords());
-  const [ticketIdentities, setTicketIdentities] = useState<TicketIdentity[]>(mockStore.getParticipants().map((p) => mockStore.getTicketIdentity(p.id)!));
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
+  const [participants, setParticipants] = useState<ParticipantListItemDTO[]>([]);
+  const [ticketOptions, setTicketOptions] = useState<TicketTypeAdminDTO[]>([]);
+  const [totalActive, setTotalActive] = useState(0);
+  const [totalArchived, setTotalArchived] = useState(0);
+  const [totalFiltered, setTotalFiltered] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTicketFilter, setSelectedTicketFilter] = useState(filterTicketId);
+  const [selectedTicketFilter, setSelectedTicketFilter] = useState(initialTicketFilter);
   const [attendanceFilter, setAttendanceFilter] = useState<'ALL' | 'HADIR' | 'BELUM'>('ALL');
 
   // Two-step Edit Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editStep, setEditStep] = useState<1 | 2>(1);
-  const [editingTarget, setEditingTarget] = useState<Participant | null>(null);
+  const [editingTarget, setEditingTarget] = useState<ParticipantListItemDTO | null>(null);
   const [editForm, setEditForm] = useState({
     fullName: '',
     nim: '',
-    email: '',
+    studyProgram: '',
+    faculty: 'Fakultas Ilmu Terapan' as TelkomFaculty,
     phone: '',
+    email: '',
     ticketTypeId: '',
   });
   const [adminPasswordConfirm, setAdminPasswordConfirm] = useState('');
@@ -59,89 +74,120 @@ function ParticipantsContent() {
   // Two-step Archive Modal
   const [archiveModalOpen, setArchiveModalOpen] = useState(false);
   const [archiveStep, setArchiveStep] = useState<1 | 2>(1);
-  const [archiveTarget, setArchiveTarget] = useState<Participant | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<ParticipantListItemDTO | null>(null);
   const [archivePassword, setArchivePassword] = useState('');
   const [archiveConfirmText, setArchiveConfirmText] = useState('');
-  const [archiveReason, setArchiveReason] = useState('');
+  const [archiveReason, setArchiveReason] = useState('Permintaan pembatalan peserta');
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [archiveSubmitting, setArchiveSubmitting] = useState(false);
 
   // Restore Modal
-  const [restoreTarget, setRestoreTarget] = useState<Participant | null>(null);
-  const [restoring, setRestoring] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<ParticipantListItemDTO | null>(null);
+  const [restorePassword, setRestorePassword] = useState('');
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoreSubmitting, setRestoreSubmitting] = useState(false);
 
-  const { success, error, info } = useToast();
+  const { success, error: toastError, info } = useToast();
 
-  const loadAll = () => {
-    participantAdapter.listParticipants().then(setParticipants);
-    ticketAdapter.listTickets().then(setTickets);
-    votingAdapter.listVotings().then(setVotings);
-    checkinAdapter.listRecords().then(setCheckins);
+  const loadParticipants = async (silent = false) => {
+    if (!silent) setLoading(true);
+    const res = await listAdminParticipantsAction({
+      tab: activeTab,
+      page,
+      pageSize: 25,
+      searchQuery,
+      ticketTypeId: selectedTicketFilter,
+      attendanceFilter,
+    });
+
+    if (res.success) {
+      setParticipants(res.participants);
+      setTotalActive(res.totalActive);
+      setTotalArchived(res.totalArchived);
+      setTotalFiltered(res.totalFiltered);
+      setTotalPages(res.totalPages);
+    } else if (!silent) {
+      toastError('Gagal Memuat Peserta', res.error || 'Terjadi kesalahan sistem.');
+    }
+    if (!silent) setLoading(false);
   };
 
   useEffect(() => {
-    loadAll();
-    const unsubscribe = mockStore.subscribe(loadAll);
-    return () => unsubscribe();
+    // Load ticket categories for filter dropdown
+    listAdminTicketsAction().then((res) => {
+      if (res.success && res.tickets) {
+        setTicketOptions(res.tickets);
+      }
+    });
   }, []);
 
-  // Filtered dataset
-  const currentList = participants.filter((p) => p.status === activeTab);
-  const filteredList = currentList.filter((p) => {
-    // Search query
-    const q = searchQuery.trim().toLowerCase();
-    const matchQuery = !q || p.fullName.toLowerCase().includes(q) || p.nim.includes(q);
+  useEffect(() => {
+    loadParticipants();
 
-    // Ticket filter
-    const matchTicket = !selectedTicketFilter || p.ticketTypeId === selectedTicketFilter;
+    // Supabase Realtime: dengarkan perubahan tabel participants dan checkins secara live
+    const supabase = createClient();
+    const channel = supabase
+      .channel('realtime:admin-participants')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'participants' },
+        () => {
+          loadParticipants(true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'checkins' },
+        () => {
+          loadParticipants(true);
+        }
+      )
+      .subscribe();
 
-    // Attendance filter
-    const hasCheckin = checkins.some(
-      (c) => c.subjectType === 'MAHASISWA' && c.subjectId === p.id
-    );
-    let matchAttendance = true;
-    if (attendanceFilter === 'HADIR') matchAttendance = hasCheckin;
-    if (attendanceFilter === 'BELUM') matchAttendance = !hasCheckin;
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeTab, page, selectedTicketFilter, attendanceFilter]);
 
-    return matchQuery && matchTicket && matchAttendance;
-  });
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    loadParticipants();
+  };
 
-  // --- ACTIONS ---
   const handleExportXlsx = () => {
-    const allIdentities = participants.map((p) => mockStore.getTicketIdentity(p.id)!);
-    const allVotes = mockStore.getVotings().flatMap((v) => mockStore.getVoteRecordsByVotingId(v.id));
-
-    exportParticipantsToXlsx({
-      participants: filteredList,
-      tickets,
-      identities: allIdentities,
-      votings,
-      voteRecords: allVotes,
-      checkinRecords: checkins,
-      filenamePrefix: `MEMORIA-Peserta-${activeTab}`,
+    const params = new URLSearchParams({
+      tab: activeTab,
+      attendanceFilter,
     });
+    if (selectedTicketFilter) params.set('ticketTypeId', selectedTicketFilter);
+    if (searchQuery.trim()) params.set('searchQuery', searchQuery.trim());
 
-    success(
-      'Ekspor Excel Berhasil',
-      `Telah mengunduh berkas .xlsx resmi untuk ${filteredList.length} peserta.`
-    );
+    window.open(`/api/admin/participants/export?${params.toString()}`, '_blank');
+    success('Mengunduh Excel', 'Berkas XLSX resmi sedang diproses dan diunduh.');
   };
 
-  const handleResendEmail = (p: Participant) => {
-    info(
-      'Simulasi Email Terkirim',
-      `E-ticket PDF resmi telah dikirim ulang ke alamat ${p.email}.`
-    );
+  const handleResendEmail = (p: ParticipantListItemDTO) => {
+    startTransition(async () => {
+      const res = await enqueueTicketResendAction(p.id);
+      if (res.success) {
+        info('Antrean Email Dijadwalkan', res.message || 'Tiket telah dijadwalkan ke antrean email.');
+      } else {
+        toastError('Gagal Menjadwalkan Email', res.error || 'Terjadi kesalahan.');
+      }
+    });
   };
 
-  // Two-step Edit flow
-  const handleOpenEdit = (p: Participant) => {
+  // Two-step Edit Handlers
+  const handleOpenEdit = (p: ParticipantListItemDTO) => {
     setEditingTarget(p);
     setEditForm({
       fullName: p.fullName,
       nim: p.nim,
-      email: p.email,
+      studyProgram: p.studyProgram,
+      faculty: p.faculty as TelkomFaculty,
       phone: p.phone,
+      email: p.email,
       ticketTypeId: p.ticketTypeId,
     });
     setEditStep(1);
@@ -163,26 +209,36 @@ function ParticipantsContent() {
     setEditSubmitting(true);
 
     try {
-      await participantAdapter.updateParticipant(editingTarget.id, editForm, adminPasswordConfirm);
-      success(
-        'Data Peserta Diperbarui',
-        `Perubahan data untuk ${editForm.fullName} (${editForm.nim}) berhasil disimpan.`
+      const res = await updateParticipantAction(
+        editingTarget.id,
+        editForm,
+        adminPasswordConfirm
       );
-      setEditModalOpen(false);
+
+      if (res.success) {
+        success(
+          'Data Peserta Diperbarui',
+          `Perubahan data untuk ${editForm.fullName} (${editForm.nim}) berhasil disimpan.`
+        );
+        setEditModalOpen(false);
+        loadParticipants();
+      } else {
+        setEditError(res.error || 'Gagal menyimpan perubahan.');
+      }
     } catch (err: any) {
-      setEditError(err.message || 'Verifikasi password salah.');
+      setEditError(err.message || 'Terjadi kesalahan sistem.');
     } finally {
       setEditSubmitting(false);
     }
   };
 
-  // Two-step Archive flow
-  const handleOpenArchive = (p: Participant) => {
+  // Two-step Archive Handlers
+  const handleOpenArchive = (p: ParticipantListItemDTO) => {
     setArchiveTarget(p);
     setArchiveStep(1);
     setArchivePassword('');
     setArchiveConfirmText('');
-    setArchiveReason('Pembatalan atas permintaan');
+    setArchiveReason('Permintaan pembatalan peserta');
     setArchiveError(null);
     setArchiveModalOpen(true);
   };
@@ -198,414 +254,516 @@ function ParticipantsContent() {
     setArchiveSubmitting(true);
 
     try {
-      await participantAdapter.archiveParticipant(archiveTarget.id, archivePassword, archiveReason);
-      success(
-        'Peserta Diarsipkan',
-        `${archiveTarget.fullName} dipindahkan ke Arsip. Kuota tiket telah dikembalikan.`
+      const res = await archiveParticipantAction(
+        archiveTarget.id,
+        archiveReason,
+        archivePassword
       );
-      setArchiveModalOpen(false);
+
+      if (res.success) {
+        success(
+          'Peserta Diarsipkan',
+          `Peserta ${archiveTarget.fullName} telah dipindahkan ke arsip dan kuotanya dilepas.`
+        );
+        setArchiveModalOpen(false);
+        loadParticipants();
+      } else {
+        setArchiveError(res.error || 'Gagal mengarsipkan peserta.');
+      }
     } catch (err: any) {
-      setArchiveError(err.message || 'Password otorisasi salah.');
+      setArchiveError(err.message || 'Terjadi kesalahan sistem.');
     } finally {
       setArchiveSubmitting(false);
     }
   };
 
-  // Restore flow
-  const handleRestore = async (p: Participant) => {
-    setRestoring(true);
+  // Restore Handlers
+  const handleOpenRestore = (p: ParticipantListItemDTO) => {
+    setRestoreTarget(p);
+    setRestorePassword('');
+    setRestoreError(null);
+  };
+
+  const handleRestoreSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!restoreTarget) return;
+    setRestoreError(null);
+    setRestoreSubmitting(true);
+
     try {
-      await participantAdapter.restoreParticipant(p.id);
-      success(
-        'Peserta Dipulihkan',
-        `${p.fullName} berhasil dipulihkan ke Peserta Aktif dengan identitas tiket semula.`
-      );
-      setRestoreTarget(null);
+      const res = await restoreParticipantAction(restoreTarget.id, restorePassword);
+      if (res.success) {
+        success('Peserta Dipulihkan', `Peserta ${restoreTarget.fullName} berhasil diaktifkan kembali.`);
+        setRestoreTarget(null);
+        loadParticipants();
+      } else {
+        setRestoreError(res.error || 'Gagal memulihkan peserta.');
+      }
     } catch (err: any) {
-      error('Gagal Memulihkan', err.message || 'Kapasitas tiket tidak mencukupi.');
+      setRestoreError(err.message || 'Terjadi kesalahan sistem.');
     } finally {
-      setRestoring(false);
+      setRestoreSubmitting(false);
     }
   };
 
   return (
-    <div className="space-y-6 max-w-7xl">
-      {/* Header & Subtabs */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-sm font-bold text-[#111827]">
-            Manajemen Data Peserta & Kehadiran
-          </h2>
-          <p className="text-xs text-[#6B7280]">
-            Pantau status check-in dan riwayat voting real-time seluruh mahasiswa terdaftar.
-          </p>
+    <AdminShell title="Kelola Data Peserta" adminOnly={false}>
+      <div className="space-y-6 max-w-7xl">
+        {/* Header toolbar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-bold text-[#111827]">Pendaftar Tiket Mahasiswa</h2>
+            <p className="text-xs text-[#6B7280]">
+              Kelola data mahasiswa dari 8 fakultas Universitas Telkom, verifikasi check-in, dan ekspor berkas.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportXlsx}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-colors"
+            >
+              <FileXls size={16} weight="bold" />
+              <span>Ekspor Excel (.xlsx)</span>
+            </button>
+            <button
+              onClick={() => loadParticipants()}
+              disabled={loading || isPending}
+              className="p-2 rounded-lg border border-[#D1D5DB] bg-white hover:bg-[#F3F4F6] text-[#374151] transition-colors"
+              title="Segarkan Data"
+            >
+              <ArrowClockwise size={16} className={loading || isPending ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
-        {/* Subtabs */}
-        <div className="flex items-center gap-2 p-1 rounded-xl bg-white border border-[#E5E7EB] self-start sm:self-auto">
+        {/* Tab switch: Aktif vs Arsip */}
+        <div className="flex items-center gap-2 border-b border-[#E5E7EB] pb-2 text-xs">
           <button
-            onClick={() => setActiveTab('ACTIVE')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              activeTab === 'ACTIVE'
+            onClick={() => {
+              setActiveTab('active');
+              setPage(1);
+            }}
+            className={`px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 ${
+              activeTab === 'active'
                 ? 'bg-[#891523] text-white shadow-xs'
-                : 'text-[#6B7280] hover:text-[#111827]'
+                : 'text-[#4B5563] hover:bg-[#F3F4F6]'
             }`}
           >
-            Peserta Aktif ({participants.filter((p) => p.status === 'ACTIVE').length})
+            <span>Peserta Aktif</span>
+            <span
+              className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                activeTab === 'active' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
+              }`}
+            >
+              {totalActive}
+            </span>
           </button>
+
           <button
-            onClick={() => setActiveTab('ARCHIVED')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              activeTab === 'ARCHIVED'
+            onClick={() => {
+              setActiveTab('archived');
+              setPage(1);
+            }}
+            className={`px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 ${
+              activeTab === 'archived'
                 ? 'bg-[#891523] text-white shadow-xs'
-                : 'text-[#6B7280] hover:text-[#111827]'
+                : 'text-[#4B5563] hover:bg-[#F3F4F6]'
             }`}
           >
-            Arsip Peserta ({participants.filter((p) => p.status === 'ARCHIVED').length})
+            <span>Arsip Peserta</span>
+            <span
+              className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                activeTab === 'archived' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
+              }`}
+            >
+              {totalArchived}
+            </span>
           </button>
         </div>
-      </div>
 
-      {/* Filter Toolbar */}
-      <div className="p-4 rounded-2xl bg-white border border-[#E5E7EB] shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[180px] max-w-xs">
+        {/* Filters Bar */}
+        <div className="bg-white p-4 rounded-xl border border-[#E5E7EB] shadow-xs flex flex-wrap items-center justify-between gap-4 text-xs">
+          {/* Search box */}
+          <form onSubmit={handleSearchSubmit} className="flex-1 min-w-[240px] max-w-md relative">
             <MagnifyingGlass
               size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]"
             />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari Nama atau NIM..."
-              className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
+              placeholder="Cari berdasarkan Nama atau NIM..."
+              className="w-full pl-9 pr-3.5 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
             />
+          </form>
+
+          {/* Filter dropdowns */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Ticket type filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[#6B7280] font-medium">Tiket:</span>
+              <select
+                value={selectedTicketFilter}
+                onChange={(e) => {
+                  setSelectedTicketFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="px-3 py-1.5 rounded-lg border border-[#D1D5DB] bg-white focus:outline-none focus:border-[#891523]"
+              >
+                <option value="">Semua Kategori Tiket</option>
+                {ticketOptions.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Attendance filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[#6B7280] font-medium">Kehadiran:</span>
+              <select
+                value={attendanceFilter}
+                onChange={(e) => {
+                  setAttendanceFilter(e.target.value as any);
+                  setPage(1);
+                }}
+                className="px-3 py-1.5 rounded-lg border border-[#D1D5DB] bg-white focus:outline-none focus:border-[#891523]"
+              >
+                <option value="ALL">Semua Kehadiran</option>
+                <option value="HADIR">Sudah Check-in</option>
+                <option value="BELUM">Belum Check-in</option>
+              </select>
+            </div>
           </div>
-
-          {/* Ticket Type Filter */}
-          <select
-            value={selectedTicketFilter}
-            onChange={(e) => setSelectedTicketFilter(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-[#D1D5DB] bg-white text-[#374151] focus:outline-none"
-          >
-            <option value="">Semua Jenis Tiket</option>
-            {tickets.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Attendance Filter (Active only) */}
-          {activeTab === 'ACTIVE' && (
-            <select
-              value={attendanceFilter}
-              onChange={(e) => setAttendanceFilter(e.target.value as any)}
-              className="px-3 py-2 rounded-lg border border-[#D1D5DB] bg-white text-[#374151] focus:outline-none"
-            >
-              <option value="ALL">Semua Kehadiran</option>
-              <option value="HADIR">Sudah Hadir</option>
-              <option value="BELUM">Belum Check-in</option>
-            </select>
-          )}
         </div>
 
-        {/* Action: Real XLSX Export Button */}
-        <button
-          onClick={handleExportXlsx}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-colors shrink-0"
-        >
-          <FileXls size={16} weight="bold" />
-          <span>Ekspor Excel (.xlsx)</span>
-        </button>
-      </div>
-
-      {/* Main Table */}
-      <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs whitespace-nowrap">
-            <thead className="bg-[#F9FAFB] border-b border-[#E5E7EB] text-[#4B5563] font-semibold uppercase tracking-wider">
-              <tr>
-                <th className="py-3 px-4">Nama Lengkap</th>
-                <th className="py-3 px-4">NIM</th>
-                <th className="py-3 px-4">Jenis Tiket</th>
-                <th className="py-3 px-4">Kontak</th>
-                <th className="py-3 px-4">Kehadiran</th>
-                <th className="py-3 px-4">Waktu Check-in</th>
-                {/* DYNAMIC VOTING COLUMNS (PRD K-22) */}
-                {votings.map((v) => (
-                  <th key={v.id} className="py-3 px-4 bg-purple-50/40 text-purple-900">
-                    Vote: {v.title}
-                  </th>
-                ))}
-                <th className="py-3 px-4 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E5E7EB]">
-              {filteredList.length > 0 ? (
-                filteredList.map((p) => {
-                  const ticket = tickets.find((t) => t.id === p.ticketTypeId);
-                  const checkin = checkins.find(
-                    (c) => c.subjectType === 'MAHASISWA' && c.subjectId === p.id
-                  );
-                  const hasCheckedIn = Boolean(checkin);
-
-                  return (
-                    <tr key={p.id} className="hover:bg-[#F9FAFB]/70 transition-colors">
-                      <td className="py-3 px-4 font-bold text-[#111827]">
-                        <Link
-                          href={`/panitia/peserta/${p.id}`}
-                          className="hover:text-[#891523] hover:underline"
-                        >
-                          {p.fullName}
-                        </Link>
-                      </td>
-                      <td className="py-3 px-4 font-mono font-bold text-[#111827]">{p.nim}</td>
-                      <td className="py-3 px-4 text-[#374151]">{ticket ? ticket.name : '—'}</td>
-                      <td className="py-3 px-4 text-[11px] text-[#6B7280]">
-                        <div>{p.email}</div>
-                        <div className="font-mono">{p.phone}</div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                            hasCheckedIn
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-gray-100 text-gray-600 border border-gray-200'
-                          }`}
-                        >
-                          {hasCheckedIn ? 'Hadir' : 'Belum Check-in'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-[11px] text-[#4B5563]">
-                        {checkin ? formatWibDateTime(checkin.checkedInAt) : '—'}
-                      </td>
-
-                      {/* DYNAMIC VOTE STATUS CELLS */}
-                      {votings.map((v) => {
-                        const hasVoted = mockStore.hasParticipantVoted(p.id, v.id);
-                        return (
-                          <td key={v.id} className="py-3 px-4 text-center">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${
-                                hasVoted
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : 'text-gray-400'
-                              }`}
-                            >
-                              {hasVoted ? 'Sudah' : 'Belum'}
+        {/* Main Table */}
+        <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-xs overflow-hidden">
+          {loading ? (
+            <div className="text-center py-20 text-xs text-[#6B7280]">
+              <div className="inline-block w-6 h-6 border-2 border-[#891523] border-t-transparent rounded-full animate-spin mb-2" />
+              <div>Memuat data peserta...</div>
+            </div>
+          ) : participants.length === 0 ? (
+            <div className="text-center py-20 px-4 space-y-2 text-xs text-[#6B7280]">
+              <p className="font-semibold text-sm text-[#111827]">Tidak Ada Data Peserta</p>
+              <p>
+                {searchQuery || selectedTicketFilter || attendanceFilter !== 'ALL'
+                  ? 'Tidak ada peserta yang cocok dengan kriteria filter saat ini.'
+                  : activeTab === 'active'
+                  ? 'Belum ada mahasiswa yang mendaftar tiket.'
+                  : 'Belum ada peserta yang diarsipkan.'}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#F9FAFB] border-b border-[#E5E7EB] text-[#4B5563] font-semibold uppercase tracking-wider">
+                  <tr>
+                    <th className="py-3.5 px-4">Nama Lengkap & Kontak</th>
+                    <th className="py-3.5 px-4">NIM</th>
+                    <th className="py-3.5 px-4">Program Studi & Fakultas</th>
+                    <th className="py-3.5 px-4">Jenis & No. Tiket</th>
+                    <th className="py-3.5 px-4">Kehadiran</th>
+                    <th className="py-3.5 px-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E5E7EB]">
+                  {participants.map((p) => {
+                    return (
+                      <tr key={p.id} className="hover:bg-[#F9FAFB]/70 transition-colors">
+                        <td className="py-3.5 px-4 font-medium text-[#111827]">
+                          <div className="font-bold">{p.fullName}</div>
+                          <div className="text-[11px] text-[#6B7280] font-normal mt-0.5">
+                            {p.email} • {p.phone}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-[#374151]">{p.nim}</td>
+                        <td className="py-3.5 px-4 text-[#4B5563]">
+                          <div className="font-medium text-[#111827]">{p.studyProgram}</div>
+                          <div className="text-[11px] text-[#6B7280]">{p.faculty}</div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-[#891523]">{p.ticketTypeName}</div>
+                          <div className="text-[11px] font-mono text-[#6B7280]">{p.ticketNumber}</div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {p.hasCheckedIn ? (
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle size={12} weight="fill" />
+                                <span>Hadir</span>
+                              </span>
+                              {p.checkedInAt && (
+                                <span className="text-[10px] text-[#6B7280] block mt-0.5">
+                                  {formatWibTimeOnly(p.checkedInAt)}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                              <Clock size={12} />
+                              <span>Belum Check-in</span>
                             </span>
-                          </td>
-                        );
-                      })}
-
-                      <td className="py-3 px-4 text-right">
-                        {activeTab === 'ACTIVE' ? (
-                          <div className="inline-flex items-center gap-1.5">
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="inline-flex items-center gap-1">
                             <Link
                               href={`/panitia/peserta/${p.id}`}
-                              className="p-1.5 rounded-md hover:bg-[#E5E7EB] text-[#4B5563]"
+                              className="p-1.5 rounded-md hover:bg-[#E5E7EB] text-[#4B5563] transition-colors"
                               title="Lihat Detail Peserta"
                             >
                               <Eye size={15} />
                             </Link>
                             <button
                               onClick={() => handleResendEmail(p)}
-                              className="p-1.5 rounded-md hover:bg-[#E5E7EB] text-[#4B5563]"
-                              title="Kirim Ulang Tiket PDF ke Email"
+                              disabled={isPending}
+                              className="p-1.5 rounded-md hover:bg-[#E5E7EB] text-[#4B5563] transition-colors"
+                              title="Kirim Ulang Tiket ke Email"
                             >
                               <EnvelopeSimple size={15} />
                             </button>
                             <button
                               onClick={() => handleOpenEdit(p)}
-                              className="p-1.5 rounded-md hover:bg-[#E5E7EB] text-[#374151]"
+                              className="p-1.5 rounded-md hover:bg-[#E5E7EB] text-[#374151] transition-colors"
                               title="Edit Data Peserta (2-Step)"
                             >
                               <PencilSimple size={15} />
                             </button>
-                            <button
-                              onClick={() => handleOpenArchive(p)}
-                              className="p-1.5 rounded-md hover:bg-rose-50 text-rose-600"
-                              title="Arsipkan Peserta (2-Step)"
-                            >
-                              <Trash size={15} />
-                            </button>
+                            {p.status === 'active' ? (
+                              <button
+                                onClick={() => handleOpenArchive(p)}
+                                className="p-1.5 rounded-md hover:bg-rose-50 text-rose-600 transition-colors"
+                                title="Arsipkan Peserta (2-Step)"
+                              >
+                                <Archive size={15} />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenRestore(p)}
+                                className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-700 transition-colors"
+                                title="Pulihkan Peserta dari Arsip"
+                              >
+                                <ArrowUUpLeft size={15} weight="bold" />
+                              </button>
+                            )}
                           </div>
-                        ) : (
-                          <button
-                            onClick={() => handleRestore(p)}
-                            disabled={restoring}
-                            className="inline-flex items-center gap-1 px-3 py-1 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
-                          >
-                            <ArrowClockwise size={13} />
-                            <span>Pulihkan</span>
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan={7 + votings.length} className="py-12 text-center text-[#9CA3AF]">
-                    Tidak ada data peserta ditemukan pada filter ini.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-[#E5E7EB] flex items-center justify-between text-xs text-[#6B7280]">
+              <div>
+                Menampilkan halaman <strong>{page}</strong> dari <strong>{totalPages}</strong> ({totalFiltered} total)
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="px-3 py-1.5 rounded-md border border-[#D1D5DB] bg-white disabled:opacity-40"
+                >
+                  Sebelumnya
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="px-3 py-1.5 rounded-md border border-[#D1D5DB] bg-white disabled:opacity-40"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* TWO-STEP EDIT MODAL */}
+      {/* ========================================================================= */}
+      {/* 2-STEP EDIT MODAL */}
+      {/* ========================================================================= */}
       {editModalOpen && editingTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-2xl max-w-lg w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 text-xs">
             <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
               <div>
-                <span className="text-[10px] font-mono font-bold text-[#891523] uppercase">
-                  VERIFIKASI TAHAP {editStep} DARI 2
-                </span>
                 <h3 className="text-sm font-bold text-[#111827]">
-                  {editStep === 1 ? 'Edit Informasi Peserta' : 'Konfirmasi Password Admin'}
+                  {editStep === 1 ? 'Tahap 1: Koreksi Data Peserta' : 'Tahap 2: Verifikasi Password Admin'}
                 </h3>
+                <span className="text-[11px] text-[#6B7280]">No. Tiket: {editingTarget.ticketNumber}</span>
               </div>
-              <button onClick={() => setEditModalOpen(false)} className="text-[#9CA3AF]">
-                <X size={18} />
+              <button
+                onClick={() => setEditModalOpen(false)}
+                className="p-1 rounded-md text-[#6B7280] hover:bg-[#F3F4F6]"
+              >
+                <X size={16} />
               </button>
             </div>
 
             {editError && (
-              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">
                 {editError}
               </div>
             )}
 
             {editStep === 1 ? (
-              /* Step 1: Edit Form */
-              <form onSubmit={handleEditSubmitStep1} className="space-y-4 text-xs">
+              <form onSubmit={handleEditSubmitStep1} className="space-y-3.5">
                 <div>
-                  <label className="block font-semibold text-[#374151] mb-1">NAMA LENGKAP</label>
+                  <label className="block font-semibold text-[#374151] mb-1">Nama Lengkap *</label>
                   <input
                     type="text"
                     required
                     value={editForm.fullName}
                     onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
                   />
                 </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-[#374151] mb-1">NIM *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editForm.nim}
+                      onChange={(e) => setEditForm({ ...editForm, nim: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] font-mono focus:outline-none focus:border-[#891523]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-[#374151] mb-1">Jenis Tiket *</label>
+                    <select
+                      value={editForm.ticketTypeId}
+                      onChange={(e) => setEditForm({ ...editForm, ticketTypeId: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] bg-white focus:outline-none focus:border-[#891523]"
+                    >
+                      {ticketOptions.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block font-semibold text-[#374151] mb-1">NIM MAHASISWA</label>
+                  <label className="block font-semibold text-[#374151] mb-1">Program Studi *</label>
                   <input
                     type="text"
                     required
-                    value={editForm.nim}
-                    onChange={(e) => setEditForm({ ...editForm, nim: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] font-mono focus:outline-none"
+                    value={editForm.studyProgram}
+                    onChange={(e) => setEditForm({ ...editForm, studyProgram: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
                   />
-                  <span className="text-[10px] text-[#6B7280] block mt-0.5">
-                    * Catatan: Nomor tiket, QR Code, dan kode voting tetap identik setelah NIM diubah.
-                  </span>
                 </div>
+
                 <div>
-                  <label className="block font-semibold text-[#374151] mb-1">JENIS TIKET</label>
+                  <label className="block font-semibold text-[#374151] mb-1">Fakultas *</label>
                   <select
-                    value={editForm.ticketTypeId}
-                    onChange={(e) => setEditForm({ ...editForm, ticketTypeId: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] bg-white"
+                    value={editForm.faculty}
+                    onChange={(e) => setEditForm({ ...editForm, faculty: e.target.value as TelkomFaculty })}
+                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] bg-white focus:outline-none focus:border-[#891523]"
                   >
-                    {tickets.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
+                    {TELKOM_FACULTIES.map((fac) => (
+                      <option key={fac} value={fac}>
+                        {fac}
                       </option>
                     ))}
                   </select>
                 </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-semibold text-[#374151] mb-1">EMAIL</label>
-                    <input
-                      type="email"
-                      required
-                      value={editForm.email}
-                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-[#374151] mb-1">NOMOR HP</label>
+                    <label className="block font-semibold text-[#374151] mb-1">Nomor WhatsApp *</label>
                     <input
                       type="tel"
                       required
                       value={editForm.phone}
                       onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] font-mono"
+                      className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] font-mono focus:outline-none focus:border-[#891523]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-[#374151] mb-1">Email *</label>
+                    <input
+                      type="email"
+                      required
+                      value={editForm.email}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
                     />
                   </div>
                 </div>
 
-                <div className="pt-2 flex justify-end gap-2 border-t border-[#E5E7EB]">
+                <div className="pt-3 flex justify-end gap-2 border-t border-[#E5E7EB]">
                   <button
                     type="button"
                     onClick={() => setEditModalOpen(false)}
-                    className="px-4 py-2 rounded-lg border border-[#E5E7EB] text-[#4B5563]"
+                    className="px-4 py-2 rounded-lg border border-[#D1D5DB] text-[#4B5563] hover:bg-[#F3F4F6]"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-lg bg-[#891523] text-white font-semibold"
+                    className="px-5 py-2 rounded-lg bg-[#891523] text-white font-semibold hover:bg-[#720e1a]"
                   >
-                    Lanjut ke Otorisasi Password →
+                    Lanjut ke Verifikasi Password →
                   </button>
                 </div>
               </form>
             ) : (
-              /* Step 2: Password Confirmation */
-              <form onSubmit={handleEditSubmitStep2} className="space-y-4 text-xs">
-                <div className="p-3 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB] space-y-1">
-                  <div className="font-semibold text-[#111827]">Ringkasan Perubahan:</div>
-                  <div className="text-[11px] text-[#6B7280]">
-                    Nama: {editingTarget.fullName} → <strong>{editForm.fullName}</strong>
-                  </div>
-                  <div className="text-[11px] text-[#6B7280]">
-                    NIM: {editingTarget.nim} → <strong>{editForm.nim}</strong>
-                  </div>
+              <form onSubmit={handleEditSubmitStep2} className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 space-y-1">
+                  <p className="font-semibold">Pratinjau Perubahan:</p>
+                  <p>
+                    Nama: <strong>{editForm.fullName}</strong> | NIM: <strong>{editForm.nim}</strong>
+                  </p>
+                  <p>
+                    Prodi: {editForm.studyProgram} ({editForm.faculty})
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-[#374151] mb-1">
-                    PASSWORD AKUN ADMIN ANDA *
+                  <label className="block font-semibold text-[#374151] mb-1 flex items-center gap-1">
+                    <Lock size={14} className="text-[#891523]" />
+                    <span>Masukkan Password Akun Admin Anda *</span>
                   </label>
                   <input
                     type="password"
                     required
                     value={adminPasswordConfirm}
                     onChange={(e) => setAdminPasswordConfirm(e.target.value)}
-                    placeholder="Masukkan password admin Anda"
-                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none"
+                    placeholder="Password akun admin saat ini..."
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
                   />
                   <span className="text-[10px] text-[#6B7280] block mt-1">
-                    (Password demo bawaan: <code>admin123</code>)
+                    Sebagai bagian dari keamanan data mahasiswa, perubahan data peserta memerlukan otorisasi ulang.
                   </span>
                 </div>
 
-                <div className="pt-2 flex justify-end gap-2 border-t border-[#E5E7EB]">
+                <div className="pt-3 flex justify-between gap-2 border-t border-[#E5E7EB]">
                   <button
                     type="button"
                     onClick={() => setEditStep(1)}
-                    className="px-4 py-2 rounded-lg border border-[#E5E7EB] text-[#4B5563]"
+                    className="px-4 py-2 rounded-lg border border-[#D1D5DB] text-[#4B5563] hover:bg-[#F3F4F6]"
                   >
-                    ← Kembali
+                    ← Kembali Edit
                   </button>
                   <button
                     type="submit"
                     disabled={editSubmitting}
-                    className="px-5 py-2 rounded-lg bg-[#891523] text-white font-semibold disabled:opacity-50"
+                    className="px-5 py-2 rounded-lg bg-[#891523] text-white font-semibold hover:bg-[#720e1a] disabled:opacity-50"
                   >
-                    {editSubmitting ? 'Menyimpan...' : 'Konfirmasi & Simpan'}
+                    {editSubmitting ? 'Menyimpan...' : 'Konfirmasi Simpan Perubahan'}
                   </button>
                 </div>
               </form>
@@ -614,117 +772,115 @@ function ParticipantsContent() {
         </div>
       )}
 
-      {/* TWO-STEP ARCHIVE MODAL */}
+      {/* ========================================================================= */}
+      {/* 2-STEP ARCHIVE MODAL */}
+      {/* ========================================================================= */}
       {archiveModalOpen && archiveTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-2xl max-w-md w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 text-xs">
             <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
-              <div>
-                <span className="text-[10px] font-mono font-bold text-rose-600 uppercase">
-                  VERIFIKASI TAHAP {archiveStep} DARI 2
-                </span>
-                <h3 className="text-sm font-bold text-[#111827]">
-                  {archiveStep === 1 ? 'Peringatan Pengarsipan' : 'Otorisasi Penghapusan Data'}
-                </h3>
-              </div>
-              <button onClick={() => setArchiveModalOpen(false)} className="text-[#9CA3AF]">
-                <X size={18} />
+              <h3 className="text-sm font-bold text-rose-700 flex items-center gap-1.5">
+                <Warning size={18} />
+                <span>Arsipkan Peserta ({archiveTarget.fullName})</span>
+              </h3>
+              <button
+                onClick={() => setArchiveModalOpen(false)}
+                className="p-1 rounded-md text-[#6B7280] hover:bg-[#F3F4F6]"
+              >
+                <X size={16} />
               </button>
             </div>
 
             {archiveError && (
-              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">
                 {archiveError}
               </div>
             )}
 
             {archiveStep === 1 ? (
-              <div className="space-y-4 text-xs">
-                <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 space-y-2">
-                  <div className="font-bold flex items-center gap-1.5">
-                    <WarningCircle size={18} />
-                    <span>Dampak Pengarsipan:</span>
-                  </div>
-                  <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
-                    <li>Peserta {archiveTarget.fullName} ({archiveTarget.nim}) akan dipindahkan ke tab Arsip.</li>
-                    <li>Tiket dan QR Code akan dinonaktifkan (ditolak saat check-in).</li>
-                    <li>Satu kuota tiket akan dikembalikan ke kapasitas tersedia.</li>
-                    <li>Suara voting dan riwayat kehadiran sebelumnya <strong>tetap dihitung</strong>.</li>
+              <div className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 space-y-1.5 leading-relaxed">
+                  <p className="font-bold">Dampak Pengarsipan Peserta:</p>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li>Kursi kuota tiket akan <strong>dilepas kembali</strong> ke kuota publik.</li>
+                    <li>Kode QR dan e-ticket peserta menjadi <strong>tidak valid</strong> untuk check-in.</li>
+                    <li>Riwayat dan data tiket tetap tersimpan di database dalam tab Arsip.</li>
                   </ul>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-[#374151] mb-1">ALASAN ARSIP (OPSIONAL)</label>
+                  <label className="block font-semibold text-[#374151] mb-1">Alasan Pengarsipan *</label>
                   <input
                     type="text"
+                    required
                     value={archiveReason}
                     onChange={(e) => setArchiveReason(e.target.value)}
-                    placeholder="Contoh: Permintaan pembatalan mandiri"
-                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] text-xs"
+                    placeholder="Contoh: Permintaan pembatalan peserta / salah daftar"
+                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
                   />
                 </div>
 
-                <div className="pt-2 flex justify-end gap-2 border-t border-[#E5E7EB]">
+                <div className="pt-3 flex justify-end gap-2 border-t border-[#E5E7EB]">
                   <button
                     type="button"
                     onClick={() => setArchiveModalOpen(false)}
-                    className="px-4 py-2 rounded-lg border border-[#E5E7EB] text-[#4B5563]"
+                    className="px-4 py-2 rounded-lg border border-[#D1D5DB] text-[#4B5563] hover:bg-[#F3F4F6]"
                   >
                     Batal
                   </button>
                   <button
                     type="button"
                     onClick={() => setArchiveStep(2)}
-                    className="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+                    className="px-4 py-2 rounded-lg bg-rose-700 text-white font-semibold hover:bg-rose-800"
                   >
-                    Lanjut ke Tahap 2 →
+                    Lanjut ke Otorisasi Password →
                   </button>
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleArchiveSubmitStep2} className="space-y-4 text-xs">
-                <div className="p-3 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB]">
-                  Ketik kata <strong className="text-rose-600 font-mono">HAPUS</strong> dan masukkan password admin Anda:
-                </div>
-
+              <form onSubmit={handleArchiveSubmitStep2} className="space-y-4">
                 <div>
-                  <label className="block font-semibold text-[#374151] mb-1">KETIK KATA KONFIRMASI</label>
+                  <label className="block font-semibold text-[#374151] mb-1">
+                    Ketik kata <span className="text-rose-700 font-bold">HAPUS</span> untuk konfirmasi:
+                  </label>
                   <input
                     type="text"
                     required
                     value={archiveConfirmText}
                     onChange={(e) => setArchiveConfirmText(e.target.value)}
                     placeholder="HAPUS"
-                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] font-mono uppercase"
+                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] font-mono focus:outline-none focus:border-rose-600"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-[#374151] mb-1">PASSWORD ADMIN</label>
+                  <label className="block font-semibold text-[#374151] mb-1">
+                    Password Akun Admin Anda *
+                  </label>
                   <input
                     type="password"
                     required
                     value={archivePassword}
                     onChange={(e) => setArchivePassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB]"
+                    placeholder="Masukkan password admin..."
+                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-rose-600"
                   />
                 </div>
 
-                <div className="pt-2 flex justify-end gap-2 border-t border-[#E5E7EB]">
+                <div className="pt-3 flex justify-between gap-2 border-t border-[#E5E7EB]">
                   <button
                     type="button"
                     onClick={() => setArchiveStep(1)}
-                    className="px-4 py-2 rounded-lg border border-[#E5E7EB] text-[#4B5563]"
+                    className="px-4 py-2 rounded-lg border border-[#D1D5DB] text-[#4B5563] hover:bg-[#F3F4F6]"
                   >
                     ← Kembali
                   </button>
                   <button
                     type="submit"
                     disabled={archiveSubmitting}
-                    className="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold disabled:opacity-50"
+                    className="px-4 py-2 rounded-lg bg-rose-700 text-white font-semibold hover:bg-rose-800 disabled:opacity-50"
                   >
-                    {archiveSubmitting ? 'Mengarsipkan...' : 'Arsipkan Peserta'}
+                    {archiveSubmitting ? 'Memproses...' : 'Ya, Arsipkan Peserta'}
                   </button>
                 </div>
               </form>
@@ -732,16 +888,78 @@ function ParticipantsContent() {
           </div>
         </div>
       )}
-    </div>
+
+      {/* ========================================================================= */}
+      {/* RESTORE MODAL */}
+      {/* ========================================================================= */}
+      {restoreTarget && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
+              <h3 className="text-sm font-bold text-emerald-800">
+                Pulihkan Peserta: {restoreTarget.fullName}
+              </h3>
+              <button
+                onClick={() => setRestoreTarget(null)}
+                className="p-1 rounded-md text-[#6B7280] hover:bg-[#F3F4F6]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {restoreError && (
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">
+                {restoreError}
+              </div>
+            )}
+
+            <p className="text-[#4B5563] leading-relaxed">
+              Peserta akan dikembalikan ke status <strong>Aktif</strong>. Tiket dan QR check-in peserta akan kembali berlaku. Sistem akan memeriksa apakah kuota jenis tiket &quot;{restoreTarget.ticketTypeName}&quot; masih tersedia.
+            </p>
+
+            <form onSubmit={handleRestoreSubmit} className="space-y-4">
+              <div>
+                <label className="block font-semibold text-[#374151] mb-1">
+                  Masukkan Password Admin *
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={restorePassword}
+                  onChange={(e) => setRestorePassword(e.target.value)}
+                  placeholder="Password akun admin saat ini..."
+                  className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2 border-t border-[#E5E7EB]">
+                <button
+                  type="button"
+                  onClick={() => setRestoreTarget(null)}
+                  className="px-4 py-2 rounded-lg border border-[#D1D5DB] text-[#4B5563] hover:bg-[#F3F4F6]"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={restoreSubmitting}
+                  className="px-4 py-2 rounded-lg bg-emerald-700 text-white font-semibold hover:bg-emerald-800 disabled:opacity-50"
+                >
+                  {restoreSubmitting ? 'Memeriksa Kuota...' : 'Konfirmasi Pulihkan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </AdminShell>
   );
 }
 
-export default function AdminParticipantsPage() {
+export default function ParticipantsPage() {
   return (
-    <AdminShell title="Data Peserta, Edit, Arsip & Ekspor" adminOnly={true}>
-      <React.Suspense fallback={<div className="py-20 text-center text-xs text-[#6B7280]">Memuat data...</div>}>
-        <ParticipantsContent />
-      </React.Suspense>
-    </AdminShell>
+    <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-500">Memuat data peserta...</div>}>
+      <ParticipantsContent />
+    </Suspense>
   );
 }

@@ -73,12 +73,12 @@ export function AwardingShowcase({ event }: AwardingShowcaseProps) {
         return;
       }
 
-      // Initial State (Sebelum Trigger)
-      if (lightRigRef.current) gsap.set(lightRigRef.current, { opacity: 0, y: -45 });
-      if (spotlightRef.current) gsap.set(spotlightRef.current, { opacity: 0, scaleY: 0.65 });
-      if (trophyRef.current) gsap.set(trophyRef.current, { opacity: 0, y: 40, scale: 0.93 });
-      gsap.set('.awarding-rig-bulb', { opacity: 0.25 });
-      gsap.set('.awarding-content-item', { opacity: 0, y: 25 });
+      // Initial State (Sebelum Trigger) - Menggunakan force3D untuk rendering GPU instan
+      if (lightRigRef.current) gsap.set(lightRigRef.current, { opacity: 0, y: -30, force3D: true });
+      if (spotlightRef.current) gsap.set(spotlightRef.current, { opacity: 0, scaleY: 0.75, force3D: true });
+      if (trophyRef.current) gsap.set(trophyRef.current, { opacity: 0, y: 25, scale: 0.95, force3D: true });
+      gsap.set('.awarding-rig-bulb', { opacity: 0.4 });
+      gsap.set('.awarding-content-item', { opacity: 0, y: 18 });
 
       if (!hasTriggered) return;
 
@@ -86,19 +86,19 @@ export function AwardingShowcase({ event }: AwardingShowcaseProps) {
       if (timelineRef.current) timelineRef.current.kill();
 
       const tl = gsap.timeline({
-        defaults: { ease: 'power3.out' },
+        defaults: { ease: 'power2.out', force3D: true },
       });
 
       timelineRef.current = tl;
 
       // =========================================================
-      // SCENE A: Entrance (Overhead circular lighting turun perlahan)
+      // SCENE A: Entrance (Overhead circular lighting turun mulus)
       // =========================================================
       tl.to(lightRigRef.current, {
         opacity: 1,
         y: 0,
-        duration: 1.1,
-        ease: 'power3.out',
+        duration: 0.65,
+        ease: 'power2.out',
       })
 
       // =========================================================
@@ -109,27 +109,27 @@ export function AwardingShowcase({ event }: AwardingShowcaseProps) {
         {
           opacity: 1,
           stagger: {
-            each: 0.035,
+            each: 0.015,
             from: 'center',
           },
-          duration: 0.5,
-          ease: 'power2.inOut',
+          duration: 0.35,
+          ease: 'power1.out',
         },
-        '-=0.5'
+        '-=0.35'
       )
       .to(
         spotlightRef.current,
         {
           opacity: 1,
           scaleY: 1,
-          duration: 0.9,
+          duration: 0.65,
           ease: 'power2.out',
         },
-        '-=0.4'
+        '-=0.3'
       )
 
       // =========================================================
-      // SCENE C: Trophy Reveal (Trophy naik perlahan dari pedestal)
+      // SCENE C: Trophy Reveal (Trophy naik proporsional dan anggun)
       // =========================================================
       .to(
         trophyRef.current,
@@ -137,14 +137,14 @@ export function AwardingShowcase({ event }: AwardingShowcaseProps) {
           opacity: 1,
           y: 0,
           scale: 1,
-          duration: 1.3,
-          ease: 'power3.out',
+          duration: 0.75,
+          ease: 'power2.out',
         },
-        '-=0.6'
+        '-=0.45'
       )
 
       // =========================================================
-      // SCENE D: Golden Shine (Light sweep bergerak melewati permukaan trophy)
+      // SCENE D: Golden Shine (Light sweep cepat dan berkilau)
       // =========================================================
       .fromTo(
         lightSweepRef.current,
@@ -155,15 +155,15 @@ export function AwardingShowcase({ event }: AwardingShowcaseProps) {
         {
           xPercent: 180,
           opacity: 0.85,
-          duration: 0.85,
+          duration: 0.6,
           ease: 'power2.inOut',
           onComplete: () => {
             if (lightSweepRef.current) {
-              gsap.to(lightSweepRef.current, { opacity: 0, duration: 0.3 });
+              gsap.to(lightSweepRef.current, { opacity: 0, duration: 0.25 });
             }
           },
         },
-        '-=0.4'
+        '-=0.3'
       )
 
       // =========================================================
@@ -174,11 +174,11 @@ export function AwardingShowcase({ event }: AwardingShowcaseProps) {
         {
           opacity: 1,
           y: 0,
-          stagger: 0.12,
-          duration: 0.8,
+          stagger: 0.08,
+          duration: 0.55,
           ease: 'power2.out',
         },
-        '-=0.5'
+        '-=0.4'
       );
     },
     { dependencies: [hasTriggered], scope: containerRef }
@@ -198,7 +198,7 @@ export function AwardingShowcase({ event }: AwardingShowcaseProps) {
       <div className="relative z-10 w-full max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
           {/* SISI KIRI: EDITORIAL INFORMATION (45% Area di Desktop) */}
-          <div className="lg:col-span-5 order-2 lg:order-1 px-2 sm:px-4">
+          <div data-scroll-stagger="left" className="lg:col-span-5 order-2 lg:order-1 px-2 sm:px-4">
             <AwardingContent
               title={event.awardingTeaser.title || 'The Golden Moment'}
               description={event.awardingTeaser.description}
@@ -207,7 +207,7 @@ export function AwardingShowcase({ event }: AwardingShowcaseProps) {
           </div>
 
           {/* SISI KANAN: ANIMATED AWARD STAGE (55% Dominan Visual di Desktop) */}
-          <div className="lg:col-span-7 order-1 lg:order-2 w-full">
+          <div data-scroll-stagger="right" className="lg:col-span-7 order-1 lg:order-2 w-full">
             <AwardingStage
               lightRigRef={lightRigRef}
               spotlightRef={spotlightRef}

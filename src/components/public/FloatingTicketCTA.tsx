@@ -3,18 +3,19 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Ticket } from '@phosphor-icons/react';
-import { ticketAdapter } from '@/data/adapters';
-import { TicketType } from '@/types';
+import { getPublicTicketsAction } from '@/app/actions/tickets';
 
 export function FloatingTicketCTA() {
   const [hasPublishedTicket, setHasPublishedTicket] = useState<boolean>(true);
 
   useEffect(() => {
     let mounted = true;
-    ticketAdapter.listPublishedTickets().then((tickets: TicketType[]) => {
+    getPublicTicketsAction().then((tickets) => {
       if (mounted) {
         setHasPublishedTicket(tickets.length > 0);
       }
+    }).catch(() => {
+      if (mounted) setHasPublishedTicket(false);
     });
     return () => {
       mounted = false;

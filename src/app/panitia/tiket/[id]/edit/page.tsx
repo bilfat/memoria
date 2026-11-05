@@ -4,11 +4,15 @@ import React, { useEffect, useState, use, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { ticketAdapter } from '@/data/adapters';
-import { mockStore } from '@/data/mock/mockStore';
-import { TicketType } from '@/types';
+import {
+  getAdminTicketAction,
+  saveTicketAction,
+  TicketTypeAdminDTO,
+  TicketAdminStatus,
+} from '@/app/actions/tickets';
+import { DateTimePicker24 } from '@/components/admin/DateTimePicker24';
 import { useToast } from '@/components/ui/Toast';
-import { ArrowLeft, FloppyDisk, Lock } from '@phosphor-icons/react';
+import { ArrowLeft, FloppyDisk, Lock, Users, Warning } from '@phosphor-icons/react';
 
 function EditTicketTypeContent({
   params,
@@ -18,31 +22,37 @@ function EditTicketTypeContent({
   const resolvedParams = use(params);
   const ticketId = resolvedParams.id;
   const router = useRouter();
-  const { success } = useToast();
+  const { success, error: toastError } = useToast();
 
-  const [ticket, setTicket] = useState<TicketType | undefined>(undefined);
+  const [ticket, setTicket] = useState<TicketTypeAdminDTO | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isLimited, setIsLimited] = useState(true);
   const [capacity, setCapacity] = useState<number>(100);
   const [opensAt, setOpensAt] = useState('');
   const [closesAt, setClosesAt] = useState('');
-  const [publication, setPublication] = useState<'DRAFT' | 'PUBLISHED'>('PUBLISHED');
+  const [status, setStatus] = useState<TicketAdminStatus>('published');
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    ticketAdapter.getTicket(ticketId).then((t) => {
-      if (t) {
+    setLoading(true);
+    getAdminTicketAction(ticketId).then((res) => {
+      if (res.success && res.ticket) {
+        const t = res.ticket;
         setTicket(t);
         setName(t.name);
         setDescription(t.description || '');
         setIsLimited(t.capacity !== null);
         setCapacity(t.capacity || 100);
-        setOpensAt(t.registrationOpensAt.substring(0, 16));
-        setClosesAt(t.registrationClosesAt.substring(0, 16));
-        setPublication(t.publication);
+        setOpensAt(t.registrationOpenAt);
+        setClosesAt(t.registrationCloseAt);
+        setStatus(t.status);
+      } else {
+        toastError('Gagal Memuat Tiket', res.error || 'Tiket tidak ditemukan.');
       }
+      setLoading(false);
     });
   }, [ticketId]);
 
@@ -56,31 +66,64 @@ function EditTicketTypeContent({
       return;
     }
 
+    if (isLimited && Number(capacity) < ticket.activeCount) {
+      setErrorMsg(
+        `Kapasitas baru (${capacity}) tidak boleh lebih kecil dari jumlah peserta aktif saat ini (${ticket.activeCount} peserta).`
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await ticketAdapter.saveTicket({
+      const res = await saveTicketAction({
         id: ticket.id,
         name: name.trim(),
-        description: description.trim(),
-        price: 0,
+        description: description.trim() || undefined,
         capacity: isLimited ? Number(capacity) : null,
-        registrationOpensAt: `${opensAt}:00+07:00`,
-        registrationClosesAt: `${closesAt}:00+07:00`,
-        publication,
+        registrationOpenAt: opensAt,
+        registrationCloseAt: closesAt,
+        status,
       });
 
-      success('Perubahan Tiket Disimpan', `Jenis tiket "${name}" telah diperbarui.`);
-      router.push('/panitia/tiket');
+      if (res.success) {
+        success('Perubahan Tiket Disimpan', `Jenis tiket "${name}" telah diperbarui.`);
+        router.push('/panitia/tiket');
+      } else {
+        setErrorMsg(res.error || 'Gagal menyimpan perubahan tiket.');
+        toastError('Gagal Menyimpan', res.error || 'Terjadi kesalahan sistem.');
+        setSubmitting(false);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Gagal menyimpan perubahan tiket.');
       setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <AdminShell title="Edit Jenis Tiket" adminOnly={true}>
+        <div className="text-center py-20 text-xs text-[#6B7280]">
+          <div className="inline-block w-6 h-6 border-2 border-[#891523] border-t-transparent rounded-full animate-spin mb-2" />
+          <div>Memuat data tiket...</div>
+        </div>
+      </AdminShell>
+    );
+  }
+
   if (!ticket) {
     return (
       <AdminShell title="Edit Jenis Tiket" adminOnly={true}>
-        <div className="text-center py-20 text-xs text-[#6B7280]">Memuat data tiket...</div>
+        <div className="text-center py-20 text-xs text-[#6B7280]">
+          <p>Jenis tiket tidak ditemukan atau telah dihapus.</p>
+          <div className="pt-4">
+            <Link
+              href="/panitia/tiket"
+              className="px-4 py-2 rounded-lg bg-[#891523] text-white font-medium"
+            >
+              Kembali ke Daftar Tiket
+            </Link>
+          </div>
+        </div>
       </AdminShell>
     );
   }
@@ -91,12 +134,31 @@ function EditTicketTypeContent({
         <div className="flex items-center justify-between">
           <Link
             href="/panitia/tiket"
-            className="inline-flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-[#111827] py-1 px-2.5 rounded-lg border border-[#E5E7EB] bg-white"
+            className="inline-flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-[#111827] py-1 px-2.5 rounded-lg border border-[#E5E7EB] bg-white transition-colors"
           >
             <ArrowLeft size={14} />
             <span>Kembali ke Daftar Tiket</span>
           </Link>
+          <Link
+            href={`/panitia/peserta?ticketId=${ticket.id}`}
+            className="inline-flex items-center gap-1.5 text-xs text-[#891523] hover:underline font-semibold"
+          >
+            <Users size={14} />
+            <span>Lihat {ticket.activeCount} Peserta Terdaftar</span>
+          </Link>
         </div>
+
+        {ticket.activeCount > 0 && (
+          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-3">
+            <Warning size={18} className="shrink-0 text-amber-600 mt-0.5" />
+            <div>
+              <p className="font-semibold">Perhatian Terkait Kapasitas Tiket:</p>
+              <p className="mt-0.5 leading-relaxed">
+                Saat ini terdapat <strong>{ticket.activeCount} peserta aktif</strong> yang memegang tiket ini. Anda tidak dapat menurunkan kuota kapasitas di bawah angka peserta aktif.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white p-6 sm:p-8 rounded-2xl border border-[#E5E7EB] shadow-xs space-y-6">
           <h2 className="text-base font-bold text-[#111827] border-b border-[#E5E7EB] pb-3">
@@ -131,6 +193,7 @@ function EditTicketTypeContent({
               />
             </div>
 
+            {/* Price locked */}
             <div>
               <label className="block font-semibold text-[#374151] mb-1 flex items-center gap-1">
                 <span>HARGA TIKET</span>
@@ -139,7 +202,7 @@ function EditTicketTypeContent({
               <input
                 type="text"
                 disabled
-                value="Gratis / Rp0"
+                value="Gratis / Rp0 (Permanen Tanpa Pembayaran)"
                 className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] text-[#6B7280] font-semibold cursor-not-allowed"
               />
             </div>
@@ -150,98 +213,88 @@ function EditTicketTypeContent({
                 <div>
                   <span className="font-semibold text-[#374151] block">Batasi Kuota Pendaftaran?</span>
                   <span className="text-[11px] text-[#6B7280]">
-                    {isLimited ? 'Kuota dibatasi dengan angka maksimal.' : 'Kapasitas tanpa batas (unlimited).'}
+                    {isLimited
+                      ? `Kuota dibatasi dengan angka maksimal (Minimal: ${ticket.activeCount} kursi).`
+                      : 'Kapasitas tanpa batas (unlimited).'}
                   </span>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={isLimited}
-                  onChange={(e) => setIsLimited(e.target.checked)}
-                  className="w-4 h-4 text-[#891523] rounded-sm focus:ring-[#891523]"
-                />
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isLimited}
+                    onChange={(e) => setIsLimited(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#891523]"></div>
+                </label>
               </div>
 
               {isLimited && (
-                <div>
+                <div className="pt-2 border-t border-[#E5E7EB]">
                   <label className="block font-semibold text-[#374151] mb-1">JUMLAH KUOTA KURSI *</label>
                   <input
                     type="number"
-                    min={1}
-                    required
+                    min={ticket.activeCount > 0 ? ticket.activeCount : 1}
+                    required={isLimited}
                     value={capacity}
                     onChange={(e) => setCapacity(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] bg-white focus:outline-none focus:border-[#891523]"
+                    className="w-full px-3.5 py-2 rounded-lg border border-[#D1D5DB] bg-white focus:outline-none focus:border-[#891523]"
                   />
+                  <span className="text-[10px] text-[#6B7280] block mt-1">
+                    Peserta aktif saat ini: {ticket.activeCount}. Sisa kuota baru: {Math.max(0, capacity - ticket.activeCount)} kursi.
+                  </span>
                 </div>
               )}
             </div>
 
             {/* Registration Period (WIB) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-semibold text-[#374151] mb-1">
-                  BUKA PENDAFTARAN (WIB) *
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={opensAt}
-                  onChange={(e) => setOpensAt(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-[#374151] mb-1">
-                  TUTUP PENDAFTARAN (WIB) *
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={closesAt}
-                  onChange={(e) => setClosesAt(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none"
-                />
-              </div>
+            <div className="p-4 rounded-xl bg-white border border-[#E5E7EB] space-y-4">
+              <span className="font-semibold text-[#374151] block border-b border-[#E5E7EB] pb-2">
+                Periode Pendaftaran Tiket (WIB)
+              </span>
+
+              <DateTimePicker24
+                label="Buka Pendaftaran"
+                required={true}
+                valueIso={opensAt}
+                onChangeIso={setOpensAt}
+                helperText="Tiket berstatus 'Upcoming' sebelum waktu pembukaan ini."
+              />
+
+              <DateTimePicker24
+                label="Tutup Pendaftaran"
+                required={true}
+                valueIso={closesAt}
+                onChangeIso={setClosesAt}
+                helperText="Tiket berstatus 'Closed' setelah waktu penutupan ini."
+              />
             </div>
 
-            {/* Publication Status */}
+            {/* Publication / Admin Status */}
             <div>
-              <label className="block font-semibold text-[#374151] mb-1">STATUS PUBLIKASI</label>
-              <div className="flex items-center gap-4 pt-1">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="editPublication"
-                    checked={publication === 'DRAFT'}
-                    onChange={() => setPublication('DRAFT')}
-                    className="text-[#891523]"
-                  />
-                  <span>Draft</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="editPublication"
-                    checked={publication === 'PUBLISHED'}
-                    onChange={() => setPublication('PUBLISHED')}
-                    className="text-[#891523]"
-                  />
-                  <span className="font-semibold text-emerald-700">Published</span>
-                </label>
-              </div>
+              <label className="block font-semibold text-[#374151] mb-1">STATUS ADMIN *</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as TicketAdminStatus)}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523] bg-white"
+              >
+                <option value="published">Published (Dapat dilihat mahasiswa di /daftar)</option>
+                <option value="draft">Draft (Disembunyikan dari publik)</option>
+                <option value="archived">Archived (Diarsipkan — tiket terbit tetap berlaku)</option>
+              </select>
             </div>
 
             <div className="pt-4 flex justify-end gap-2 border-t border-[#E5E7EB]">
               <Link
                 href="/panitia/tiket"
-                className="px-4 py-2 rounded-lg border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F9FAFB]"
+                className="px-4 py-2 rounded-lg border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F9FAFB] font-medium transition-colors"
               >
                 Batal
               </Link>
               <button
                 type="submit"
                 disabled={submitting}
-                className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-[#891523] text-white font-semibold hover:bg-[#720e1a] shadow-xs disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-[#891523] text-white font-semibold hover:bg-[#720e1a] shadow-xs disabled:opacity-50 transition-colors"
               >
                 <FloppyDisk size={16} />
                 <span>{submitting ? 'Menyimpan...' : 'Simpan Perubahan'}</span>

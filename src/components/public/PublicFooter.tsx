@@ -1,9 +1,37 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BrandLogotype } from '../brand/BrandLogotype';
 import { Sparkle } from '@phosphor-icons/react';
+import { getPublicEventSettings } from '@/app/actions/cms';
 
-export function PublicFooter() {
+interface PublicFooterProps {
+  description?: string;
+  footerText?: string;
+}
+
+export function PublicFooter({ description: propDesc, footerText: propFooter }: PublicFooterProps) {
+  const [desc, setDesc] = useState(propDesc || '');
+  const [footer, setFooter] = useState(propFooter || '');
+
+  useEffect(() => {
+    if (propDesc && propFooter) return;
+    getPublicEventSettings()
+      .then((settings) => {
+        if (!propDesc && settings?.description) setDesc(settings.description);
+        if (!propFooter && settings?.footerText) setFooter(settings.footerText);
+      })
+      .catch(() => {});
+  }, [propDesc, propFooter]);
+
+  const displayDesc =
+    desc ||
+    'Perayaan Diesnatalis D4 Sistem Informasi Kota Cerdas, Fakultas Ilmu Terapan. Malam penuh memori, keanggunan beludru merah, dan selebrasi prestasi civitas akademika.';
+  const displayFooter =
+    footer ||
+    'MEMORIA 2026 — Himpunan Mahasiswa S1 Terapan Sistem Informasi Kota Cerdas, Fakultas Ilmu Terapan.';
+
   return (
     <footer className="relative border-t border-[#d6b46a]/35 pt-16 pb-12 overflow-hidden text-neutral-800 z-10 select-none">
       {/* Decorative top ambient crimson & gold glow */}
@@ -14,8 +42,7 @@ export function PublicFooter() {
           <BrandLogotype size="lg" showSubtitle={true} variant="dark" />
 
           <p className="max-w-xl text-sm text-neutral-600 font-normal leading-relaxed">
-            Perayaan Diesnatalis D4 Sistem Informasi Kota Cerdas, Fakultas Ilmu Terapan.
-            Malam penuh memori, keanggunan beludru merah, dan selebrasi prestasi civitas akademika.
+            {displayDesc}
           </p>
 
           <div className="flex flex-wrap justify-center items-center gap-6 text-xs text-neutral-700 py-2.5 border-y border-[#d6b46a]/30 w-full max-w-lg font-medium">
@@ -45,7 +72,7 @@ export function PublicFooter() {
           </div>
 
           <div className="text-[11px] text-neutral-500 tracking-wider">
-            &copy; 2026 MEMORIA SIKC • Telkom University. All rights reserved.
+            &copy; 2026 {displayFooter}
           </div>
         </div>
       </div>

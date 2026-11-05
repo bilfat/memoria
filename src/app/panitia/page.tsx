@@ -1,85 +1,104 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { mockStore } from '@/data/mock/mockStore';
+import { getDashboardMetricsAction, DashboardMetrics } from '@/app/actions/dashboard';
+import { createClient } from '@/lib/supabase/client';
 import {
   Users,
   CheckCircle,
   Ticket,
-  CheckSquareOffset,
   EnvelopeSimple,
   QrCode,
   ArrowRight,
-  Clock,
-  ArrowClockwise,
+  ArrowsClockwise,
+  CheckSquareOffset,
 } from '@phosphor-icons/react';
 import { formatWibDateTime } from '@/lib/date';
 import { useToast } from '@/components/ui/Toast';
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardMetrics>({
     totalActiveParticipants: 0,
     presentParticipants: 0,
     uncheckinParticipants: 0,
     publishedTickets: 0,
     totalQuota: 0,
     usedQuota: 0,
-    activeVotings: 0,
-    totalVotes: 0,
+    hasUnlimitedTickets: false,
     totalLecturers: 0,
     presentLecturers: 0,
-    recentCheckins: mockStore.getCheckinRecords().slice(0, 5),
+    totalVenueCheckins: 0,
+    recentCheckins: [],
   });
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { success } = useToast();
+  const { error: toastError } = useToast();
 
-  const calculateStats = () => {
-    const participants = mockStore.getParticipants('ACTIVE');
-    const checkins = mockStore.getCheckinRecords();
-    const tickets = mockStore.getPublishedTickets();
-    const votings = mockStore.getVotings();
-    const voteRecords = mockStore.getVotings().flatMap((v) => mockStore.getVoteRecordsByVotingId(v.id));
-    const lecturers = mockStore.getLecturerInvitations().filter((l) => l.active);
-
-    const studentCheckins = checkins.filter((c) => c.subjectType === 'MAHASISWA');
-    const lecturerCheckins = checkins.filter((c) => c.subjectType === 'DOSEN');
-
-    let totalCap = 0;
-    tickets.forEach((t) => {
-      if (t.capacity !== null) totalCap += t.capacity;
-    });
-
-    setStats({
-      totalActiveParticipants: participants.length,
-      presentParticipants: studentCheckins.length,
-      uncheckinParticipants: Math.max(0, participants.length - studentCheckins.length),
-      publishedTickets: tickets.length,
-      totalQuota: totalCap,
-      usedQuota: participants.length,
-      activeVotings: votings.filter((v) => mockStore.getVotingRuntimeStatus(v) === 'AKTIF').length,
-      totalVotes: voteRecords.length,
-      totalLecturers: lecturers.length,
-      presentLecturers: lecturerCheckins.length,
-      recentCheckins: checkins.slice(0, 5),
-    });
-  };
+  const loadMetrics = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const res = await getDashboardMetricsAction();
+      if (res.success && res.metrics) {
+        setStats(res.metrics);
+        setErrorMessage(null);
+      } else if (!silent) {
+        setErrorMessage(res.error || 'Gagal memuat metrik dari database.');
+        toastError('Gagal Memuat Metrik', res.error || 'Terjadi kesalahan sistem.');
+      }
+    } catch (err: any) {
+      if (!silent) {
+        setErrorMessage(err.message || 'Terjadi kesalahan sistem.');
+        toastError('Kesalahan Sistem', err.message);
+      }
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [toastError]);
 
   useEffect(() => {
-    calculateStats();
-    const unsubscribe = mockStore.subscribe(() => {
-      calculateStats();
-    });
-    return () => unsubscribe();
-  }, []);
+    loadMetrics();
 
-  const handleResetData = () => {
-    if (confirm('Kembalikan seluruh data mock ke kondisi awal (seed)? Tindakan ini akan mereset registrasi dan check-in baru.')) {
-      mockStore.resetToDefault();
-      success('Mock Data Direset', 'Semua data dikembalikan ke seed awal Diesnatalis SIKC 2026.');
-    }
-  };
+    // Supabase Realtime: sinkronisasi otomatis metrik saat ada data masuk / check-in
+    const supabase = createClient();
+    const channel = supabase
+      .channel('realtime:admin-dashboard')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'participants' },
+        () => {
+          loadMetrics(true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'checkins' },
+        () => {
+          loadMetrics(true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tickets' },
+        () => {
+          loadMetrics(true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'lecturers' },
+        () => {
+          loadMetrics(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadMetrics]);
 
   return (
     <AdminShell title="Dashboard Ringkasan Acara" adminOnly={true}>
@@ -91,7 +110,7 @@ export default function AdminDashboardPage() {
               Selamat Datang di Panel MEMORIA
             </h2>
             <p className="text-xs text-[#6B7280] mt-1">
-              Pantau seluruh aktivitas pendaftaran tiket, kehadiran tamu, voting private, dan pengumuman acara.
+              Pantau seluruh aktivitas pendaftaran tiket, kapasitas kuota, presensi meja registrasi, dan publikasi website resmi.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -103,17 +122,35 @@ export default function AdminDashboardPage() {
               <span>Buka Check-in</span>
             </Link>
             <button
-              onClick={handleResetData}
-              className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-[#E5E7EB] text-[#4B5563] text-xs font-medium hover:bg-[#F9FAFB] transition-colors"
-              title="Reset ke data awal"
+              onClick={() => loadMetrics()}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-[#E5E7EB] text-[#4B5563] text-xs font-medium hover:bg-[#F9FAFB] transition-colors cursor-pointer disabled:opacity-50"
+              title="Perbarui data metrik"
             >
-              <ArrowClockwise size={15} />
-              <span className="hidden sm:inline">Reset Demo</span>
+              <ArrowsClockwise size={15} className={loading ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">Perbarui</span>
             </button>
           </div>
         </div>
 
-        {/* Primary Metric KPI Grid */}
+        {/* Error Notification Banner if query fails */}
+        {errorMessage && (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-4">
+            <div>
+              <span className="font-bold block">Gagal menyinkronkan data dengan Supabase:</span>
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              onClick={() => loadMetrics()}
+              disabled={loading}
+              className="px-3 py-1.5 bg-rose-700 text-white rounded-lg text-xs font-semibold hover:bg-rose-800 shrink-0 cursor-pointer"
+            >
+              Coba Lagi
+            </button>
+          </div>
+        )}
+
+        {/* Primary Metric KPI Grid (Live from DB) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* 1. Peserta Mahasiswa */}
           <Link
@@ -135,12 +172,12 @@ export default function AdminDashboardPage() {
               <div className="text-[11px] text-[#6B7280] mt-1 flex items-center gap-1">
                 <span className="text-emerald-600 font-semibold">{stats.presentParticipants} Hadir</span>
                 <span>•</span>
-                <span>{stats.uncheckinParticipants} Belum Check-in</span>
+                <span>{stats.uncheckinParticipants} Belum Presensi</span>
               </div>
             </div>
           </Link>
 
-          {/* 2. Kapasitas Tiket */}
+          {/* 2. Kapasitas & Kuota Tiket */}
           <Link
             href="/panitia/tiket"
             className="p-5 rounded-xl bg-white border border-[#E5E7EB] shadow-xs hover:border-[#891523]/40 transition-all flex flex-col justify-between"
@@ -155,33 +192,33 @@ export default function AdminDashboardPage() {
             </div>
             <div className="mt-4">
               <div className="text-2xl font-bold text-[#111827]">
-                {stats.publishedTickets} Jenis
+                {stats.publishedTickets} Kategori
               </div>
               <div className="text-[11px] text-[#6B7280] mt-1">
-                {stats.usedQuota} terpakai dari {stats.totalQuota} kuota
+                {stats.usedQuota} terpakai {stats.totalQuota > 0 ? `dari ${stats.totalQuota} kuota` : '(kuota fleksibel)'}
               </div>
             </div>
           </Link>
 
-          {/* 3. Voting & Suara */}
+          {/* 3. Total Presensi di Venue */}
           <Link
-            href="/panitia/voting"
+            href="/panitia/check-in"
             className="p-5 rounded-xl bg-white border border-[#E5E7EB] shadow-xs hover:border-[#891523]/40 transition-all flex flex-col justify-between"
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
-                Suara Sah Masuk
+                Total Hadir di Lokasi
               </span>
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
-                <CheckSquareOffset size={18} weight="bold" />
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                <CheckCircle size={18} weight="bold" />
               </div>
             </div>
             <div className="mt-4">
-              <div className="text-2xl font-bold text-[#111827]">
-                {stats.totalVotes} Suara
+              <div className="text-2xl font-bold text-emerald-600">
+                {stats.totalVenueCheckins} Orang
               </div>
               <div className="text-[11px] text-[#6B7280] mt-1">
-                {stats.activeVotings} sesi voting berstatus Aktif
+                {stats.presentParticipants} Mahasiswa • {stats.presentLecturers} Dosen VIP
               </div>
             </div>
           </Link>
@@ -226,7 +263,7 @@ export default function AdminDashboardPage() {
                   <QrCode size={20} className="text-[#891523]" />
                   <div>
                     <div className="text-xs font-bold text-[#111827]">Scanner Check-in</div>
-                    <div className="text-[10px] text-[#6B7280]">Pemindaian QR tiket dan manual</div>
+                    <div className="text-[10px] text-[#6B7280]">Pemindaian QR tiket dan presensi manual</div>
                   </div>
                 </div>
                 <ArrowRight size={15} className="text-[#9CA3AF]" />
@@ -240,7 +277,7 @@ export default function AdminDashboardPage() {
                   <Users size={20} className="text-[#891523]" />
                   <div>
                     <div className="text-xs font-bold text-[#111827]">Kelola Data Peserta</div>
-                    <div className="text-[10px] text-[#6B7280]">Edit, arsip, dan ekspor .xlsx</div>
+                    <div className="text-[10px] text-[#6B7280]">Edit 2-tahap, arsip, dan ekspor .xlsx</div>
                   </div>
                 </div>
                 <ArrowRight size={15} className="text-[#9CA3AF]" />
@@ -254,7 +291,7 @@ export default function AdminDashboardPage() {
                   <Ticket size={20} className="text-[#891523]" />
                   <div>
                     <div className="text-xs font-bold text-[#111827]">Kelola Konten Website</div>
-                    <div className="text-[10px] text-[#6B7280]">Perbarui tanggal, venue, dan teasers</div>
+                    <div className="text-[10px] text-[#6B7280]">Perbarui tanggal, venue, band & teasers</div>
                   </div>
                 </div>
                 <ArrowRight size={15} className="text-[#9CA3AF]" />
@@ -289,7 +326,7 @@ export default function AdminDashboardPage() {
                           {chk.subjectName}
                         </div>
                         <div className="text-[11px] text-[#6B7280] font-mono truncate">
-                          {chk.subjectType === 'MAHASISWA' ? `NIM: ${chk.subjectIdentifier}` : `Kode: ${chk.subjectIdentifier}`} • Metoda {chk.method}
+                          {chk.subjectType === 'MAHASISWA' ? `NIM: ${chk.subjectIdentifier}` : `Kode: ${chk.subjectIdentifier}`} • Metode {chk.method}
                         </div>
                       </div>
                     </div>
@@ -304,7 +341,7 @@ export default function AdminDashboardPage() {
               </div>
             ) : (
               <div className="text-center py-8 text-xs text-[#9CA3AF]">
-                Belum ada tamu yang check-in.
+                Belum ada tamu yang check-in di venue.
               </div>
             )}
           </div>

@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrandLogotype } from '../brand/BrandLogotype';
-import { List, X, LockKey } from '@phosphor-icons/react';
+import { List, X, LockKey, Ticket } from '@phosphor-icons/react';
+import { CekTiketModal } from './CekTiketModal';
 
 const NAV_LINKS = [
   { label: 'Beranda', href: '/' },
@@ -15,6 +16,7 @@ const NAV_LINKS = [
 export function PublicNavbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [cekTiketModalOpen, setCekTiketModalOpen] = useState(false);
   const [hoveredHref, setHoveredHref] = useState<string | null>(null);
 
   const navRef = useRef<HTMLElement>(null);
@@ -146,8 +148,21 @@ export function PublicNavbar() {
           </span>
         </nav>
 
-        {/* Right side helper / panitia portal link */}
-        <div className="hidden md:flex items-center gap-4">
+        {/* Right side helper: Cek Tiket & panitia portal link */}
+        <div className="hidden md:flex items-center gap-3">
+          <button
+            onClick={() => setCekTiketModalOpen(true)}
+            className={`flex items-center gap-1.5 text-xs font-semibold tracking-wider transition-all py-1.5 px-3.5 rounded-full border cursor-pointer ${
+              isLightNav
+                ? 'text-[#891523] border-[#891523]/40 bg-[#891523]/5 hover:bg-[#891523] hover:text-white'
+                : 'text-[#f5d890] border-[#d6b46a]/50 bg-[#891523]/30 hover:bg-[#891523] hover:text-white shadow-xs'
+            }`}
+            title="Cari & Cek Status Tiket Anda"
+          >
+            <Ticket size={14} weight="fill" />
+            <span>Cek Tiket</span>
+          </button>
+
           <Link
             href="/panitia/login"
             className={`flex items-center gap-1.5 text-xs transition-colors py-1.5 px-3 rounded-full border ${
@@ -162,16 +177,28 @@ export function PublicNavbar() {
           </Link>
         </div>
 
-        {/* Mobile Hamburger Button */}
-        <div className="flex md:hidden items-center gap-3">
+        {/* Mobile: Cek Tiket di pojok kanan tulisan Memoria (baris yang sama, BUKAN di baris ke-3) */}
+        <div className="flex md:hidden items-center gap-2">
+          <button
+            onClick={() => setCekTiketModalOpen(true)}
+            className={`flex items-center gap-1 text-[11px] font-semibold tracking-wider py-1.5 px-2.5 rounded-full border transition-all cursor-pointer ${
+              isLightNav
+                ? 'text-[#891523] border-[#891523]/40 bg-[#891523]/5'
+                : 'text-[#f5d890] border-[#d6b46a]/60 bg-[#891523]/40'
+            }`}
+          >
+            <Ticket size={13} weight="fill" />
+            <span>Cek Tiket</span>
+          </button>
+
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className={`p-2 focus:outline-none transition-colors ${
+            className={`p-1.5 focus:outline-none transition-colors ${
               isLightNav ? 'text-[#3E2418] hover:text-[#891523]' : 'text-memoria-ivory hover:text-memoria-gold'
             }`}
             aria-label="Buka menu navigasi"
           >
-            {mobileMenuOpen ? <X size={26} /> : <List size={26} />}
+            {mobileMenuOpen ? <X size={24} /> : <List size={24} />}
           </button>
         </div>
       </div>
@@ -185,6 +212,18 @@ export function PublicNavbar() {
               : 'border-memoria-gold/20 bg-memoria-dark-wine/95 backdrop-blur-xl text-memoria-ivory'
           }`}
         >
+          {/* Cek Tiket Link in Mobile Drawer */}
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              setCekTiketModalOpen(true);
+            }}
+            className="flex items-center gap-2 py-2 px-3 rounded-xl bg-[#891523]/30 border border-memoria-gold/40 text-memoria-gold text-sm font-semibold cursor-pointer text-left w-full"
+          >
+            <Ticket size={16} weight="fill" />
+            <span>Cek Tiket (NIM / ID Order)</span>
+          </button>
+
           {NAV_LINKS.map((link) => {
             const isActive = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
             return (
@@ -232,6 +271,11 @@ export function PublicNavbar() {
           </div>
         </div>
       )}
+      {/* Theatrical Cek Tiket Popup Modal with Stage Smoke Animation */}
+      <CekTiketModal
+        isOpen={cekTiketModalOpen}
+        onClose={() => setCekTiketModalOpen(false)}
+      />
     </header>
   );
 }

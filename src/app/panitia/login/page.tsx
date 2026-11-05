@@ -3,14 +3,13 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { accountAdapter } from '@/data/adapters';
-import { BrandLogotype } from '@/components/brand/BrandLogotype';
-import { Lock, EnvelopeSimple, Eye, EyeSlash, ArrowLeft, WarningCircle, UserCircleGear, QrCode } from '@phosphor-icons/react';
+import { loginAction } from '@/app/actions/auth';
+import { Lock, EnvelopeSimple, Eye, EyeSlash, ArrowLeft, WarningCircle } from '@phosphor-icons/react';
 
 export default function PanitiaLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@memoria.telkom.id');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -21,27 +20,24 @@ export default function PanitiaLoginPage() {
     setLoading(true);
 
     try {
-      const user = await accountAdapter.login(email, password);
-      if (user.role === 'ADMIN_PANITIA') {
-        window.location.href = '/panitia';
-      } else {
-        window.location.href = '/panitia/check-in';
+      const res = await loginAction({ email, password });
+      if (!res.success) {
+        setErrorMessage(res.message);
+        setLoading(false);
+        return;
       }
+
+      if (res.user && typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('memoria_staff_session', JSON.stringify(res.user));
+        } catch {}
+      }
+
+      window.location.href = res.redirectTo;
     } catch (err: any) {
-      setErrorMessage(err.message || 'Email atau password tidak sesuai.');
+      setErrorMessage(err.message || 'Terjadi kesalahan sistem saat memproses login.');
       setLoading(false);
     }
-  };
-
-  const handleFillDemo = (role: 'ADMIN' | 'PETUGAS') => {
-    if (role === 'ADMIN') {
-      setEmail('admin@memoria.telkom.id');
-      setPassword('admin123');
-    } else {
-      setEmail('petugas@memoria.telkom.id');
-      setPassword('petugas123');
-    }
-    setErrorMessage(null);
   };
 
   return (
@@ -131,43 +127,11 @@ export default function PanitiaLoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-[#891523] hover:bg-[#720e1a] text-white font-semibold text-xs tracking-wider transition-colors shadow-sm disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-[#891523] hover:bg-[#720e1a] text-white font-semibold text-xs tracking-wider transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
             >
               {loading ? 'Memverifikasi...' : 'Masuk ke Dashboard'}
             </button>
           </form>
-
-          {/* Quick Demo Credentials Switcher */}
-          <div className="pt-4 border-t border-[#E5E7EB] space-y-2">
-            <span className="text-[11px] font-semibold text-[#6B7280] block text-center uppercase tracking-wider">
-              Pilihan Akun Demo Cepat:
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleFillDemo('ADMIN')}
-                className="py-2 px-2.5 rounded-lg border border-[#E5E7EB] hover:bg-[#FAEDEF] hover:border-[#891523]/40 text-left transition-colors flex items-center gap-2"
-              >
-                <UserCircleGear size={20} className="text-[#891523] shrink-0" />
-                <div className="truncate">
-                  <div className="text-[11px] font-bold text-[#111827]">Admin Panitia</div>
-                  <div className="text-[9px] text-[#6B7280]">admin@memoria...</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleFillDemo('PETUGAS')}
-                className="py-2 px-2.5 rounded-lg border border-[#E5E7EB] hover:bg-[#FAEDEF] hover:border-[#891523]/40 text-left transition-colors flex items-center gap-2"
-              >
-                <QrCode size={20} className="text-[#891523] shrink-0" />
-                <div className="truncate">
-                  <div className="text-[11px] font-bold text-[#111827]">Petugas Check-in</div>
-                  <div className="text-[9px] text-[#6B7280]">petugas@memoria...</div>
-                </div>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 

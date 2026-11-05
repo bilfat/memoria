@@ -4,23 +4,29 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { ticketAdapter } from '@/data/adapters';
+import { saveTicketAction } from '@/app/actions/tickets';
+import { DateTimePicker24 } from '@/components/admin/DateTimePicker24';
 import { useToast } from '@/components/ui/Toast';
 import { ArrowLeft, FloppyDisk, Lock } from '@phosphor-icons/react';
 
 export default function CreateTicketTypePage() {
   const router = useRouter();
-  const { success } = useToast();
+  const { success, error: toastError } = useToast();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isLimited, setIsLimited] = useState(true);
   const [capacity, setCapacity] = useState<number>(100);
-  const [opensAt, setOpensAt] = useState('2026-10-20T08:00');
-  const [closesAt, setClosesAt] = useState('2026-11-20T17:00');
-  const [publication, setPublication] = useState<'DRAFT' | 'PUBLISHED'>('PUBLISHED');
+  const [opensAt, setOpensAt] = useState('');
+  const [closesAt, setClosesAt] = useState('');
+  const [status, setStatus] = useState<'draft' | 'published'>('published');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setOpensAt(new Date().toISOString());
+    setClosesAt(new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString());
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,18 +39,23 @@ export default function CreateTicketTypePage() {
 
     setSubmitting(true);
     try {
-      await ticketAdapter.saveTicket({
+      const res = await saveTicketAction({
         name: name.trim(),
-        description: description.trim(),
-        price: 0,
+        description: description.trim() || undefined,
         capacity: isLimited ? Number(capacity) : null,
-        registrationOpensAt: `${opensAt}:00+07:00`,
-        registrationClosesAt: `${closesAt}:00+07:00`,
-        publication,
+        registrationOpenAt: opensAt,
+        registrationCloseAt: closesAt,
+        status,
       });
 
-      success('Tiket Berhasil Dibuat', `Jenis tiket "${name}" telah disimpan.`);
-      router.push('/panitia/tiket');
+      if (res.success) {
+        success('Tiket Berhasil Dibuat', `Jenis tiket "${name}" telah disimpan.`);
+        router.push('/panitia/tiket');
+      } else {
+        setErrorMsg(res.error || 'Gagal menyimpan jenis tiket.');
+        toastError('Gagal Menyimpan', res.error || 'Terjadi kesalahan sistem.');
+        setSubmitting(false);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Gagal menyimpan jenis tiket.');
       setSubmitting(false);
@@ -57,7 +68,7 @@ export default function CreateTicketTypePage() {
         <div className="flex items-center justify-between">
           <Link
             href="/panitia/tiket"
-            className="inline-flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-[#111827] py-1 px-2.5 rounded-lg border border-[#E5E7EB] bg-white"
+            className="inline-flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-[#111827] py-1 px-2.5 rounded-lg border border-[#E5E7EB] bg-white transition-colors"
           >
             <ArrowLeft size={14} />
             <span>Kembali ke Daftar Tiket</span>
@@ -83,34 +94,31 @@ export default function CreateTicketTypePage() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Contoh: VIP Student Pass"
+                placeholder="Contoh: Tiket Reguler Mahasiswa Tel-U"
                 className="w-full px-3.5 py-2.5 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
               />
             </div>
 
             <div>
-              <label className="block font-semibold text-[#374151] mb-1">DESKRIPSI TIKET</label>
+              <label className="block font-semibold text-[#374151] mb-1">DESKRIPSI (OPSIONAL)</label>
               <textarea
-                rows={2}
+                rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Fasilitas atau peruntukan jenis tiket ini..."
+                placeholder="Penjelasan hak akses tiket atau ketentuan kehadiran..."
                 className="w-full px-3.5 py-2.5 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
               />
             </div>
 
-            {/* Price locked to Free */}
-            <div>
-              <label className="block font-semibold text-[#374151] mb-1 flex items-center gap-1">
-                <span>HARGA TIKET</span>
-                <Lock size={12} className="text-[#9CA3AF]" />
-              </label>
-              <input
-                type="text"
-                disabled
-                value="Gratis / Rp0 (Sesuai Aturan Locked)"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] text-[#6B7280] font-semibold cursor-not-allowed"
-              />
+            {/* Price: Free guarantee */}
+            <div className="p-3.5 rounded-xl bg-[#FAEDEF]/60 border border-[#891523]/20 flex items-center justify-between">
+              <div>
+                <span className="font-semibold text-[#891523] block">Harga Tiket: Rp 0 (GRATIS)</span>
+                <span className="text-[11px] text-[#6B7280]">
+                  Sesuai kebijakan MEMORIA 2026, seluruh tiket masuk diesnatalis tidak dipungut biaya.
+                </span>
+              </div>
+              <Lock size={18} className="text-[#891523]" />
             </div>
 
             {/* Quota limit toggle */}
@@ -119,100 +127,87 @@ export default function CreateTicketTypePage() {
                 <div>
                   <span className="font-semibold text-[#374151] block">Batasi Kuota Pendaftaran?</span>
                   <span className="text-[11px] text-[#6B7280]">
-                    {isLimited ? 'Kuota dibatasi dengan angka maksimal.' : 'Kapasitas tanpa batas (unlimited).'}
+                    Pilih batas jumlah peserta atau biarkan tanpa batas (unlimited).
                   </span>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={isLimited}
-                  onChange={(e) => setIsLimited(e.target.checked)}
-                  className="w-4 h-4 text-[#891523] rounded-sm focus:ring-[#891523]"
-                />
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isLimited}
+                    onChange={(e) => setIsLimited(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#891523]"></div>
+                </label>
               </div>
 
               {isLimited && (
-                <div>
-                  <label className="block font-semibold text-[#374151] mb-1">JUMLAH KUOTA KURSI *</label>
+                <div className="pt-2 border-t border-[#E5E7EB]">
+                  <label className="block font-semibold text-[#374151] mb-1">JUMLAH KUOTA (KURSI) *</label>
                   <input
                     type="number"
                     min={1}
-                    required
+                    required={isLimited}
                     value={capacity}
                     onChange={(e) => setCapacity(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] bg-white focus:outline-none focus:border-[#891523]"
+                    className="w-full px-3.5 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
                   />
+                  <span className="text-[10px] text-[#6B7280] block mt-1">
+                    Kuota akan otomatis berkurang ketika ada peserta aktif yang mendaftar.
+                  </span>
                 </div>
               )}
             </div>
 
-            {/* Registration Period (WIB) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-semibold text-[#374151] mb-1">
-                  BUKA PENDAFTARAN (WIB) *
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={opensAt}
-                  onChange={(e) => setOpensAt(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-[#374151] mb-1">
-                  TUTUP PENDAFTARAN (WIB) *
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={closesAt}
-                  onChange={(e) => setClosesAt(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-[#D1D5DB] focus:outline-none"
-                />
-              </div>
+            {/* Registration Period: 24-hour WIB DateTimePicker */}
+            <div className="p-4 rounded-xl bg-white border border-[#E5E7EB] space-y-4">
+              <span className="font-semibold text-[#374151] block border-b border-[#E5E7EB] pb-2">
+                Periode Pendaftaran Tiket (WIB)
+              </span>
+
+              <DateTimePicker24
+                label="Waktu Buka Pendaftaran"
+                required={true}
+                valueIso={opensAt}
+                onChangeIso={setOpensAt}
+                helperText="Tiket akan berstatus 'Upcoming / Belum Dibuka' sebelum waktu ini."
+              />
+
+              <DateTimePicker24
+                label="Waktu Tutup Pendaftaran"
+                required={true}
+                valueIso={closesAt}
+                onChangeIso={setClosesAt}
+                helperText="Tiket akan berstatus 'Closed / Ditutup' setelah waktu ini."
+              />
             </div>
 
             {/* Publication Status */}
             <div>
-              <label className="block font-semibold text-[#374151] mb-1">STATUS PUBLIKASI</label>
-              <div className="flex items-center gap-4 pt-1">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="publication"
-                    checked={publication === 'DRAFT'}
-                    onChange={() => setPublication('DRAFT')}
-                    className="text-[#891523]"
-                  />
-                  <span>Draft (Belum tampil di halaman pilih tiket)</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="publication"
-                    checked={publication === 'PUBLISHED'}
-                    onChange={() => setPublication('PUBLISHED')}
-                    className="text-[#891523]"
-                  />
-                  <span className="font-semibold text-emerald-700">Published (Dapat dipilih publik)</span>
-                </label>
-              </div>
+              <label className="block font-semibold text-[#374151] mb-1">STATUS PUBLIKASI *</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as 'draft' | 'published')}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-[#D1D5DB] focus:outline-none focus:border-[#891523] bg-white cursor-pointer"
+              >
+                <option value="published">Published (Dapat dilihat mahasiswa di /daftar)</option>
+                <option value="draft">Draft (Disembunyikan dari halaman publik)</option>
+              </select>
             </div>
 
-            <div className="pt-4 flex justify-end gap-2 border-t border-[#E5E7EB]">
+            <div className="pt-4 border-t border-[#E5E7EB] flex justify-end gap-2">
               <Link
                 href="/panitia/tiket"
-                className="px-4 py-2 rounded-lg border border-[#E5E7EB] text-[#4B5563] hover:bg-[#F9FAFB]"
+                className="px-4 py-2 rounded-lg border border-[#D1D5DB] text-xs font-semibold text-[#374151] hover:bg-[#F9FAFB]"
               >
                 Batal
               </Link>
               <button
                 type="submit"
                 disabled={submitting}
-                className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-[#891523] text-white font-semibold hover:bg-[#720e1a] shadow-xs disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-[#891523] hover:bg-[#720e1a] text-white text-xs font-semibold shadow-xs disabled:opacity-50 cursor-pointer"
               >
-                <FloppyDisk size={16} />
+                <FloppyDisk size={15} />
                 <span>{submitting ? 'Menyimpan...' : 'Simpan Jenis Tiket'}</span>
               </button>
             </div>

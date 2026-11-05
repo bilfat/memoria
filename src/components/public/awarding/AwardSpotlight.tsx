@@ -11,7 +11,7 @@ export const AwardSpotlight = React.forwardRef<HTMLDivElement, AwardSpotlightPro
     return (
       <div
         ref={ref}
-        className={`absolute inset-0 pointer-events-none overflow-hidden select-none z-10 ${className}`}
+        className={`absolute inset-0 pointer-events-none overflow-hidden select-none z-10 will-change-[transform,opacity] ${className}`}
       >
         {/* 1. PRIMARY MAIN SPOTLIGHT BEAM (Tegak Lurus Mengarah ke Trophy) */}
         <div

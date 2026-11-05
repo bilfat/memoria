@@ -3,14 +3,21 @@
 import React, { useEffect, useState, useRef, use, Suspense } from 'react';
 import Link from 'next/link';
 import gsap from 'gsap';
-import { useGSAP } from '@gsap/react';
-import { invitationAdapter, eventAdapter } from '@/data/adapters';
-import { mockStore } from '@/data/mock/mockStore';
-import { LecturerInvitation, InvitationTemplate, EventContent } from '@/types';
+import {
+  getPublicInvitationByTokenAction,
+  PublicInvitationViewDTO,
+} from '@/app/actions/invitations';
 import { BrandLogotype } from '@/components/brand/BrandLogotype';
 import { generateQrDataUrl } from '@/lib/qrCode';
 import { formatWibDateOnly, formatWibTimeOnly } from '@/lib/date';
-import { EnvelopeSimple, EnvelopeOpen, QrCode, Sparkle, WarningCircle, CalendarBlank, MapPin, House } from '@phosphor-icons/react';
+import {
+  EnvelopeSimple,
+  QrCode,
+  WarningCircle,
+  CalendarBlank,
+  MapPin,
+  House,
+} from '@phosphor-icons/react';
 
 function LecturerInvitationContent({
   params,
@@ -20,13 +27,11 @@ function LecturerInvitationContent({
   const resolvedParams = use(params);
   const inviteToken = resolvedParams.inviteToken;
 
-  const [lecturer, setLecturer] = useState<LecturerInvitation | undefined>(undefined);
-  const [template, setTemplate] = useState<InvitationTemplate>(mockStore.getInvitationTemplate());
-  const [event, setEvent] = useState<EventContent>(mockStore.getEvent());
+  const [invitation, setInvitation] = useState<PublicInvitationViewDTO | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
-  // Envelope state: 'CLOSED' | 'OPENING' | 'OPENED'
+  // Envelope animation state: 'CLOSED' | 'OPENING' | 'OPENED'
   const [envelopeState, setEnvelopeState] = useState<'CLOSED' | 'OPENING' | 'OPENED'>('CLOSED');
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,20 +41,27 @@ function LecturerInvitationContent({
   const qrSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    eventAdapter.getEvent().then(setEvent);
-    invitationAdapter.getTemplate().then(setTemplate);
-    invitationAdapter.getLecturerByToken(inviteToken).then((lec) => {
-      setLecturer(lec);
-      if (lec) {
-        generateQrDataUrl(lec.checkinQrToken).then(setQrDataUrl);
-      }
-      setLoading(false);
-    });
+    setLoading(true);
+    getPublicInvitationByTokenAction(inviteToken)
+      .then((data) => {
+        setInvitation(data);
+        if (data && data.qrToken) {
+          generateQrDataUrl(data.qrToken).then(setQrDataUrl);
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [inviteToken]);
 
   // Preview opening state untuk visual testing
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.search.includes('previewOpening=1') && !loading && lecturer) {
+    if (
+      typeof window !== 'undefined' &&
+      window.location.search.includes('previewOpening=1') &&
+      !loading &&
+      invitation
+    ) {
       setEnvelopeState('OPENING');
       if (sealRef.current) sealRef.current.style.opacity = '0';
       if (flapRef.current) {
@@ -60,13 +72,16 @@ function LecturerInvitationContent({
         gsap.set(letterRef.current, { y: -125, scale: 1.03 });
       }
     }
-  }, [loading, lecturer]);
+  }, [loading, invitation]);
 
   const handleOpenEnvelope = () => {
     if (envelopeState !== 'CLOSED') return;
     setEnvelopeState('OPENING');
 
-    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     if (prefersReduced) {
       setEnvelopeState('OPENED');
       return;
@@ -91,7 +106,6 @@ function LecturerInvitationContent({
           ease: 'power2.inOut',
           transformOrigin: 'top center',
           onUpdate: function () {
-            // Begitu penutup terlipat ke atas lebih dari 90 derajat, turunkan z-index ke belakang surat (z-5)
             if (flapRef.current) {
               if (this.progress() >= 0.45) {
                 flapRef.current.style.zIndex = '5';
@@ -103,7 +117,7 @@ function LecturerInvitationContent({
         },
         '-=0.1'
       )
-      // 3. Letter slides up out of envelope pocket IN FRONT OF the flap
+      // 3. Letter slides up out of envelope pocket IN FRONT OF flap
       .to(
         letterRef.current,
         {
@@ -123,34 +137,61 @@ function LecturerInvitationContent({
   if (loading) {
     return (
       <div className="min-h-screen bg-memoria-midnight text-memoria-ivory flex items-center justify-center p-4 font-mono text-xs">
-        Memuat surat undangan kehormatan...
-      </div>
-    );
-  }
-
-  if (!lecturer) {
-    return (
-      <div className="min-h-screen bg-memoria-midnight text-memoria-ivory flex items-center justify-center p-4">
-        <div className="max-w-md text-center p-8 rounded-3xl bg-memoria-dark-wine/70 border border-memoria-gold/30 space-y-4 shadow-2xl">
-          <WarningCircle size={48} className="text-rose-400 mx-auto" />
-          <h1 className="text-xl font-bold">Undangan Tidak Ditemukan</h1>
-          <p className="text-xs text-memoria-champagne/80">
-            Tautan undangan personal dosen tidak valid atau telah diperbarui oleh panitia.
-          </p>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-memoria-burgundy text-memoria-ivory text-xs uppercase font-bold"
-          >
-            <House size={16} />
-            <span>Kembali ke Beranda</span>
-          </Link>
+        <div className="text-center space-y-2">
+          <div className="inline-block w-8 h-8 border-2 border-memoria-gold border-t-transparent rounded-full animate-spin" />
+          <p className="text-memoria-champagne/80">Memuat surat undangan kehormatan...</p>
         </div>
       </div>
     );
   }
 
-  // Replace variable in template
-  const personalizedGreeting = template.greeting.replace('{{nama_dosen}}', lecturer.name);
+  if (!invitation) {
+    return (
+      <div className="min-h-screen bg-memoria-midnight text-memoria-ivory flex items-center justify-center p-4">
+        <div className="max-w-md text-center p-8 rounded-3xl bg-memoria-dark-wine/70 border border-memoria-gold/30 space-y-4 shadow-2xl">
+          <WarningCircle size={48} className="text-rose-400 mx-auto" />
+          <h1 className="text-xl font-bold">Undangan Tidak Ditemukan</h1>
+          <p className="text-xs text-memoria-champagne/80 leading-relaxed">
+            Tautan undangan personal dosen tidak valid atau telah dinonaktifkan oleh panitia pelaksana.
+          </p>
+          <div className="pt-2">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-memoria-burgundy text-memoria-ivory text-xs uppercase font-bold"
+            >
+              <House size={16} />
+              <span>Kembali ke Beranda</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!invitation.isActive) {
+    return (
+      <div className="min-h-screen bg-memoria-midnight text-memoria-ivory flex items-center justify-center p-4">
+        <div className="max-w-md text-center p-8 rounded-3xl bg-memoria-dark-wine/70 border border-rose-500/50 space-y-4 shadow-2xl">
+          <WarningCircle size={48} className="text-rose-400 mx-auto" />
+          <h1 className="text-xl font-bold text-rose-300">Undangan Telah Dinonaktifkan</h1>
+          <p className="text-xs text-memoria-champagne/80 leading-relaxed">
+            Surat undangan kehormatan untuk Bapak/Ibu {invitation.fullName} saat ini berada dalam status nonaktif. Silakan hubungi panitia MEMORIA untuk informasi lebih lanjut.
+          </p>
+          <div className="pt-2">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-memoria-burgundy text-memoria-ivory text-xs uppercase font-bold"
+            >
+              <House size={16} />
+              <span>Kembali ke Beranda</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const { template } = invitation;
 
   return (
     <div
@@ -173,7 +214,7 @@ function LecturerInvitationContent({
               style={{ fontFamily: 'var(--font-bodoni), serif' }}
               className="text-2xl sm:text-3xl font-bold text-memoria-ivory"
             >
-              Yth. {lecturer.name}
+              Yth. {invitation.fullName}
             </h1>
             <p className="text-xs text-memoria-champagne/80">
               Silakan sentuh atau klik tombol di bawah untuk membuka amplop resmi.
@@ -182,20 +223,20 @@ function LecturerInvitationContent({
 
           {/* Realistic 3D Interactive Velvet Envelope Container */}
           <div className="relative w-80 sm:w-96 h-56 sm:h-64 rounded-2xl bg-gradient-to-br from-[#400c14] to-[#1c0408] border-2 border-memoria-gold/60 shadow-[0_20px_50px_rgba(0,0,0,0.8)] perspective-[1000px] flex items-center justify-center overflow-visible mt-10 sm:mt-16">
-            {/* Inside Paper Letter (partially hidden inside pocket, slides out IN FRONT of opened flap) */}
+            {/* Inside Paper Letter */}
             <div
               ref={letterRef}
               className="absolute w-[88%] h-44 sm:h-52 rounded-xl bg-[#fff9f0] border border-memoria-gold/40 shadow-inner flex flex-col items-center justify-center text-center p-4 z-[15] will-change-transform"
             >
               <div className="text-[10px] font-mono tracking-widest text-[#891523] uppercase font-bold">
-                DIESNATALIS SIKC 2026
+                DIESNATALIS 2026
               </div>
               <div className="font-serif text-[#350a10] font-bold text-sm sm:text-base mt-1">
-                MEMORIA —
+                {invitation.eventName} —
               </div>
               <div className="w-12 h-[1px] bg-memoria-gold my-2" />
               <div className="text-[10px] text-[#553338] italic">
-                Surat Kehormatan untuk {lecturer.name}
+                Surat Kehormatan untuk {invitation.fullName}
               </div>
             </div>
 
@@ -210,7 +251,7 @@ function LecturerInvitationContent({
               }}
             />
 
-            {/* Flap Triangle (Opens upwards, drops to z-5 behind letter when flipped) */}
+            {/* Flap Triangle */}
             <div
               ref={flapRef}
               className="absolute inset-x-0 top-0 h-1/2 z-[30] pointer-events-none will-change-transform"
@@ -221,7 +262,7 @@ function LecturerInvitationContent({
               }}
             />
 
-            {/* Gold Wax Seal (Center of flap) */}
+            {/* Gold Wax Seal */}
             <div
               ref={sealRef}
               onClick={handleOpenEnvelope}
@@ -279,12 +320,12 @@ function LecturerInvitationContent({
 
             {/* Greeting */}
             <div className="text-sm sm:text-base font-bold text-[#350a10]">
-              {personalizedGreeting}
+              {template.greeting} {invitation.fullName}
             </div>
 
             {/* Body */}
             <div className="text-xs sm:text-sm text-[#4a2e33] leading-relaxed whitespace-pre-line font-normal">
-              {template.body}
+              {template.renderedBody}
             </div>
 
             {/* Event Specifics Box */}
@@ -294,7 +335,7 @@ function LecturerInvitationContent({
                 <div>
                   <span className="font-bold text-[#350a10] block">Waktu Acara:</span>
                   <span className="text-[#4a2e33]">
-                    {formatWibDateOnly(event.eventStartAt)} • {formatWibTimeOnly(event.eventStartAt)}
+                    {formatWibDateOnly(invitation.eventStartAt)} • {formatWibTimeOnly(invitation.eventStartAt)}
                   </span>
                 </div>
               </div>
@@ -303,7 +344,7 @@ function LecturerInvitationContent({
                 <div>
                   <span className="font-bold text-[#350a10] block">Lokasi & Tempat:</span>
                   <span className="text-[#4a2e33]">
-                    {event.venueName} — {event.venueAddress}
+                    {invitation.venueName} — {invitation.venueAddress}
                   </span>
                 </div>
               </div>
@@ -320,7 +361,7 @@ function LecturerInvitationContent({
               </div>
             </div>
 
-            {/* QR Check-in Section (Scroll Target) */}
+            {/* QR Check-in Section */}
             <div
               ref={qrSectionRef}
               className="pt-8 border-t-2 border-dashed border-memoria-gold/40 flex flex-col items-center text-center gap-3"
@@ -337,7 +378,7 @@ function LecturerInvitationContent({
               )}
 
               <div className="text-[11px] font-mono text-[#5c3a3f]">
-                KODE UNDANGAN: <span className="font-bold text-[#891523]">{lecturer.inviteCode}</span>
+                KODE UNDANGAN: <span className="font-bold text-[#891523]">{invitation.invitationCode}</span>
               </div>
               <p className="text-[10px] text-[#6b4545] max-w-sm">
                 * Bapak/Ibu dosen tidak perlu melakukan registrasi akun. Cukup tunjukkan QR Code ini
@@ -350,7 +391,7 @@ function LecturerInvitationContent({
 
       {/* Footer */}
       <div className="text-center text-[11px] text-memoria-champagne/60 py-4 max-w-2xl mx-auto w-full">
-        MEMORIA — Diesnatalis SIKC 2026. Undangan Kehormatan Personal.
+        {invitation.eventName} — Undangan Kehormatan Personal.
       </div>
     </div>
   );
@@ -358,7 +399,13 @@ function LecturerInvitationContent({
 
 export default function LecturerInvitationPage(props: { params: Promise<{ inviteToken: string }> }) {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#140809] flex items-center justify-center text-xs text-[#D6B46A]">Menyiapkan amplop undangan...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#140809] flex items-center justify-center text-xs text-[#D6B46A]">
+          Menyiapkan amplop undangan...
+        </div>
+      }
+    >
       <LecturerInvitationContent {...props} />
     </Suspense>
   );

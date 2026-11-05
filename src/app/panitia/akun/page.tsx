@@ -2,7 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { accountAdapter } from '@/data/adapters';
+import {
+  listAccountsAction,
+  createAccountAction,
+  updateAccountAction,
+  toggleAccountStatusAction,
+  resetAccountPasswordAction,
+  getCurrentStaffSession,
+} from '@/app/actions/auth';
 import { useToast } from '@/components/ui/Toast';
 import { InternalAccount, Role, AccountStatus } from '@/types';
 import {
@@ -24,7 +31,7 @@ export default function AccountManagementPage() {
 
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<InternalAccount[]>([]);
-  const currentUser = accountAdapter.getCurrentUser();
+  const [currentUser, setCurrentUser] = useState<InternalAccount | null>(null);
 
   // Create / Edit modal state
   const [accountModalOpen, setAccountModalOpen] = useState(false);
@@ -46,8 +53,18 @@ export default function AccountManagementPage() {
 
   const loadAccounts = async () => {
     try {
-      const list = await accountAdapter.listAccounts();
-      setAccounts(list);
+      const [accountsRes, userRes] = await Promise.all([
+        listAccountsAction(),
+        getCurrentStaffSession(),
+      ]);
+
+      if (accountsRes.success && accountsRes.data) {
+        setAccounts(accountsRes.data);
+      } else {
+        toastError('Gagal Memuat Akun', accountsRes.message || 'Terjadi kesalahan sistem.');
+      }
+
+      setCurrentUser(userRes);
     } catch (err: any) {
       toastError('Gagal Memuat Akun', err.message);
     } finally {
@@ -79,40 +96,43 @@ export default function AccountManagementPage() {
     setAccountModalOpen(true);
   };
 
+  const handleOpenReset = (acc: InternalAccount) => {
+    setResetTargetAccount(acc);
+    setNewPassword('');
+    setConfirmPassword('');
+    setResetError(null);
+    setResetModalOpen(true);
+  };
+
   const handleSaveAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setModalError(null);
-
-    if (!formName.trim() || !formEmail.trim()) {
-      setModalError('Nama lengkap dan email wajib diisi.');
-      return;
-    }
-
-    if (!editingId && formPassword.length < 8) {
-      setModalError('Kata sandi awal minimal 8 karakter.');
-      return;
-    }
-
     setModalSaving(true);
+
     try {
       if (editingId) {
-        await accountAdapter.saveAccount({
+        const res = await updateAccountAction({
           id: editingId,
-          fullName: formName.trim(),
-          email: formEmail.trim(),
+          fullName: formName,
           role: formRole,
-          status: 'ACTIVE',
         });
-        success('Akun Diperbarui', `Perubahan akun ${formName} berhasil disimpan.`);
+
+        if (!res.success) throw new Error(res.message);
+        success('Akun Diperbarui', `Data akun ${formName} berhasil disimpan.`);
       } else {
-        await accountAdapter.saveAccount({
-          fullName: formName.trim(),
-          email: formEmail.trim(),
+        if (!formPassword || formPassword.length < 6) {
+          throw new Error('Password awal minimal 6 karakter.');
+        }
+
+        const res = await createAccountAction({
+          fullName: formName,
+          email: formEmail,
           role: formRole,
-          status: 'ACTIVE',
           password: formPassword,
         });
-        success('Akun Dibuat', `Akun internal ${formName} (${formRole}) siap digunakan.`);
+
+        if (!res.success) throw new Error(res.message);
+        success('Akun Dibuat', `Akun panitia ${formName} berhasil didaftarkan.`);
       }
 
       setAccountModalOpen(false);
@@ -124,284 +144,307 @@ export default function AccountManagementPage() {
     }
   };
 
-  const handleOpenReset = (acc: InternalAccount) => {
-    setResetTargetAccount(acc);
-    setNewPassword('');
-    setConfirmPassword('');
-    setResetError(null);
-    setResetModalOpen(true);
-  };
-
-  const handleExecuteReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!resetTargetAccount) return;
-
-    if (newPassword.length < 8) {
-      setResetError('Kata sandi baru minimal 8 karakter.');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setResetError('Konfirmasi kata sandi tidak cocok.');
-      return;
-    }
-
-    setResetSaving(true);
-    try {
-      await accountAdapter.resetPassword(resetTargetAccount.id, newPassword);
-      success(
-        'Kata Sandi Direset',
-        `Kata sandi untuk ${resetTargetAccount.fullName} berhasil diperbarui.`
-      );
-      setResetModalOpen(false);
-    } catch (err: any) {
-      setResetError(err.message || 'Gagal mereset kata sandi.');
-    } finally {
-      setResetSaving(false);
-    }
-  };
-
   const handleToggleStatus = async (acc: InternalAccount) => {
-    if (acc.id === currentUser?.id) {
-      if (!confirm('Anda sedang mengubah status akun Anda sendiri. Lanjutkan?')) return;
+    const nextStatus = acc.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const actionLabel = nextStatus === 'ACTIVE' ? 'mengaktifkan' : 'menonaktifkan';
+
+    if (!window.confirm(`Yakin ingin ${actionLabel} akun ${acc.fullName}?`)) {
+      return;
     }
 
     try {
-      const updated = await accountAdapter.toggleStatus(acc.id);
-      success(
-        'Status Berubah',
-        `Akun ${acc.fullName} kini berstatus ${updated.status}.`
-      );
+      const res = await toggleAccountStatusAction({
+        id: acc.id,
+        targetStatus: nextStatus,
+      });
+
+      if (!res.success) throw new Error(res.message);
+      success('Status Diperbarui', `Status akun ${acc.fullName} diubah menjadi ${nextStatus}.`);
       await loadAccounts();
     } catch (err: any) {
       toastError('Gagal Mengubah Status', err.message);
     }
   };
 
-  const adminCount = accounts.filter((a) => a.role === 'ADMIN_PANITIA').length;
-  const staffCount = accounts.filter((a) => a.role === 'PETUGAS_CHECKIN').length;
+  const handleSaveResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError(null);
+
+    if (newPassword.length < 6) {
+      setResetError('Password minimal 6 karakter.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setResetError('Konfirmasi password tidak cocok.');
+      return;
+    }
+
+    if (!resetTargetAccount) return;
+
+    setResetSaving(true);
+    try {
+      const res = await resetAccountPasswordAction({
+        id: resetTargetAccount.id,
+        newPassword,
+      });
+
+      if (!res.success) throw new Error(res.message);
+      success('Password Direset', `Password akun ${resetTargetAccount.fullName} berhasil diubah.`);
+      setResetModalOpen(false);
+    } catch (err: any) {
+      setResetError(err.message || 'Gagal mereset password.');
+    } finally {
+      setResetSaving(false);
+    }
+  };
 
   return (
-    <AdminShell title="Kelola Akun Panitia & Petugas Presensi" adminOnly={true}>
+    <AdminShell title="Kelola Akun Panitia" adminOnly={true}>
       <div className="space-y-6">
-        {/* Top Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl border border-neutral-200 p-4">
-            <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-              Total Akun Terdaftar
-            </span>
-            <div className="text-2xl font-extrabold text-neutral-900 mt-1">{accounts.length}</div>
-            <p className="text-[11px] text-neutral-400 mt-0.5">Semua pengguna internal</p>
+        {/* Header Action */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-[#E5E7EB] shadow-xs">
+          <div>
+            <h2 className="text-base font-bold text-[#111827]">
+              Daftar Petugas & Administrator
+            </h2>
+            <p className="text-xs text-[#6B7280] mt-0.5">
+              Kelola hak akses internal sistem MEMORIA 2026.
+            </p>
           </div>
-
-          <div className="bg-white rounded-xl border border-neutral-200 p-4">
-            <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-              Admin Panitia
-            </span>
-            <div className="text-2xl font-extrabold text-purple-700 mt-1">{adminCount}</div>
-            <p className="text-[11px] text-neutral-400 mt-0.5">Akses penuh seluruh modul</p>
-          </div>
-
-          <div className="bg-white rounded-xl border border-neutral-200 p-4">
-            <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-              Petugas Check-in
-            </span>
-            <div className="text-2xl font-extrabold text-blue-700 mt-1">{staffCount}</div>
-            <p className="text-[11px] text-neutral-400 mt-0.5">Akses khusus meja registrasi</p>
-          </div>
-        </div>
-
-        {/* Action Header */}
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-neutral-500">
-            Daftar kredensial operator internal MEMORIA 2026 dengan aturan perlindungan Last Admin.
-          </p>
 
           <button
             onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-neutral-900 text-xs font-semibold text-white hover:bg-neutral-800"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#891523] text-white text-xs font-semibold hover:bg-[#720e1a] transition-colors shadow-sm cursor-pointer"
           >
-            <Plus size={15} /> Tambah Akun Pengguna
+            <Plus size={16} weight="bold" />
+            <span>Tambah Akun Panitia</span>
           </button>
         </div>
 
-        {/* Accounts Table */}
-        <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
-          {loading ? (
-            <div className="p-8 text-center text-xs text-neutral-500">Memuat data akun...</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-neutral-50 text-neutral-600 border-b border-neutral-200">
+        {/* Account Table */}
+        <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB] text-[#6B7280] font-semibold uppercase tracking-wider">
+                  <th className="py-3 px-4">Nama Lengkap</th>
+                  <th className="py-3 px-4">Email Login</th>
+                  <th className="py-3 px-4">Peran (Role)</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E5E7EB]">
+                {loading ? (
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Nama Lengkap</th>
-                    <th className="px-4 py-3 font-semibold">Alamat Email</th>
-                    <th className="px-4 py-3 font-semibold">Peran (Role)</th>
-                    <th className="px-4 py-3 font-semibold">Status Akun</th>
-                    <th className="px-4 py-3 font-semibold text-right">Aksi Manajemen</th>
+                    <td colSpan={5} className="py-8 text-center text-neutral-400">
+                      Memuat daftar akun panitia...
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {accounts.map((acc) => {
-                    const isSelf = acc.id === currentUser?.id;
+                ) : accounts.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-neutral-400">
+                      Belum ada akun panitia terdaftar.
+                    </td>
+                  </tr>
+                ) : (
+                  accounts.map((acc) => {
+                    const isSelf = currentUser?.id === acc.id;
+                    const isActive = acc.status === 'ACTIVE';
+
                     return (
-                      <tr key={acc.id} className="hover:bg-neutral-50/70 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="font-bold text-neutral-900 flex items-center gap-1.5">
-                            {acc.fullName}
-                            {isSelf && (
-                              <span className="text-[10px] bg-neutral-200 text-neutral-800 px-1.5 py-0.2 rounded font-normal">
-                                Anda
-                              </span>
-                            )}
+                      <tr key={acc.id} className="hover:bg-neutral-50/60 transition-colors">
+                        <td className="py-3.5 px-4 font-semibold text-[#111827]">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-[#FAEDEF] text-[#891523] flex items-center justify-center font-bold text-xs shrink-0">
+                              {acc.fullName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="truncate">
+                              <div>{acc.fullName}</div>
+                              {isSelf && (
+                                <span className="text-[10px] text-[#891523] font-normal">
+                                  (Sesi Anda Saat Ini)
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 font-mono text-neutral-600">{acc.email}</td>
-                        <td className="px-4 py-3">
+                        <td className="py-3.5 px-4 text-[#4B5563] font-mono text-[11px]">
+                          {acc.email}
+                        </td>
+                        <td className="py-3.5 px-4">
                           {acc.role === 'ADMIN_PANITIA' ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200">
-                              <ShieldCheck size={12} weight="fill" /> Admin Panitia
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-semibold">
+                              <ShieldCheck size={14} />
+                              <span>Admin Panitia</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
-                              <User size={12} /> Petugas Check-in
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-semibold">
+                              <User size={14} />
+                              <span>Petugas Check-in</span>
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStatus(acc)}
-                            title="Klik untuk mengubah status aktif/nonaktif"
-                            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border cursor-pointer ${
-                              acc.status === 'ACTIVE'
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                                : 'bg-red-50 text-red-800 border-red-200 hover:bg-red-100'
-                            }`}
-                          >
-                            {acc.status === 'ACTIVE' ? 'Aktif' : 'Nonaktif'}
-                          </button>
+                        <td className="py-3.5 px-4">
+                          {isActive ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                              <CheckCircle size={14} weight="fill" />
+                              <span>Aktif</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-neutral-400 font-medium">
+                              <XCircle size={14} weight="fill" />
+                              <span>Nonaktif</span>
+                            </span>
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="inline-flex items-center gap-1">
                             <button
-                              type="button"
-                              onClick={() => handleOpenReset(acc)}
-                              title="Reset Kata Sandi"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-neutral-700 bg-white border border-neutral-300 rounded hover:bg-neutral-50"
+                              onClick={() => handleOpenEdit(acc)}
+                              className="p-1.5 rounded-lg border border-[#E5E7EB] hover:bg-[#F3F4F6] text-[#4B5563] transition-colors"
+                              title="Edit Nama & Role"
                             >
-                              <Key size={13} /> Reset Sandi
+                              <PencilSimple size={15} />
                             </button>
 
                             <button
-                              type="button"
-                              onClick={() => handleOpenEdit(acc)}
-                              title="Edit Profil Akun"
-                              className="p-1 rounded border border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+                              onClick={() => handleOpenReset(acc)}
+                              className="p-1.5 rounded-lg border border-[#E5E7EB] hover:bg-[#F3F4F6] text-[#4B5563] transition-colors"
+                              title="Reset Password"
                             >
-                              <PencilSimple size={14} />
+                              <Key size={15} />
+                            </button>
+
+                            <button
+                              onClick={() => handleToggleStatus(acc)}
+                              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
+                                isActive
+                                  ? 'border-neutral-200 text-neutral-600 hover:bg-neutral-100'
+                                  : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                              }`}
+                            >
+                              {isActive ? 'Nonaktifkan' : 'Aktifkan'}
                             </button>
                           </div>
                         </td>
                       </tr>
                     );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Modal Create / Edit Account */}
         {accountModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 space-y-4">
-              <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-                <h3 className="text-sm font-bold text-neutral-900">
-                  {editingId ? 'Edit Akun Pengguna' : 'Tambah Akun Pengguna Baru'}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="fixed inset-0 bg-black/40 backdrop-blur-xs"
+              onClick={() => !modalSaving && setAccountModalOpen(false)}
+            />
+            <div className="relative max-w-md w-full bg-white rounded-2xl border border-[#E5E7EB] shadow-2xl p-6 space-y-5 z-10">
+              <div className="flex items-center justify-between pb-3 border-b border-[#E5E7EB]">
+                <h3 className="text-sm font-bold text-[#111827]">
+                  {editingId ? 'Edit Data Akun Panitia' : 'Tambah Akun Panitia Baru'}
                 </h3>
                 <button
-                  type="button"
                   onClick={() => setAccountModalOpen(false)}
-                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-700"
+                  disabled={modalSaving}
+                  className="p-1 text-[#9CA3AF] hover:text-[#4B5563]"
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
               </div>
 
               {modalError && (
-                <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-xs">
-                  {modalError}
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
+                  <WarningCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+                  <span>{modalError}</span>
                 </div>
               )}
 
-              <form onSubmit={handleSaveAccount} className="space-y-3.5">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-neutral-700">Nama Lengkap *</label>
+              <form onSubmit={handleSaveAccount} className="space-y-4 text-xs">
+                <div>
+                  <label className="block font-semibold text-[#374151] mb-1">
+                    NAMA LENGKAP
+                  </label>
                   <input
                     type="text"
                     required
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    placeholder="Nama operator"
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                    placeholder="Contoh: Rian Pratama"
+                    className="w-full px-3 py-2 rounded-xl border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-neutral-700">Alamat Email Login *</label>
+                <div>
+                  <label className="block font-semibold text-[#374151] mb-1">
+                    EMAIL LOGIN
+                  </label>
                   <input
                     type="email"
                     required
+                    disabled={!!editingId}
                     value={formEmail}
                     onChange={(e) => setFormEmail(e.target.value)}
-                    placeholder="email@memoria.ac.id"
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                    placeholder="admin@memoria.telkom.id"
+                    className="w-full px-3 py-2 rounded-xl border border-[#D1D5DB] focus:outline-none focus:border-[#891523] disabled:bg-neutral-100 disabled:text-neutral-500"
                   />
+                  {editingId && (
+                    <span className="text-[10px] text-neutral-400 mt-1 block">
+                      Email tidak dapat diubah setelah akun dibuat.
+                    </span>
+                  )}
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-neutral-700">Peran Akun *</label>
+                <div>
+                  <label className="block font-semibold text-[#374151] mb-1">
+                    PERAN (ROLE)
+                  </label>
                   <select
                     value={formRole}
                     onChange={(e) => setFormRole(e.target.value as Role)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                    className="w-full px-3 py-2 rounded-xl border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
                   >
-                    <option value="PETUGAS_CHECKIN">Petugas Check-in (Registrasi Presensi)</option>
-                    <option value="ADMIN_PANITIA">Admin Panitia (Akses Penuh Semua Modul)</option>
+                    <option value="PETUGAS_CHECKIN">Petugas Check-in (Khusus Meja Hadir & Scanner)</option>
+                    <option value="ADMIN_PANITIA">Admin Panitia (Akses Penuh Seluruh Modul)</option>
                   </select>
                 </div>
 
                 {!editingId && (
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-neutral-700">
-                      Kata Sandi Awal (Min. 8 Karakter) *
+                  <div>
+                    <label className="block font-semibold text-[#374151] mb-1">
+                      PASSWORD AWAL
                     </label>
                     <input
                       type="password"
                       required
                       value={formPassword}
                       onChange={(e) => setFormPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                      placeholder="Minimal 6 karakter"
+                      className="w-full px-3 py-2 rounded-xl border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
                     />
                   </div>
                 )}
 
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-100">
+                <div className="pt-2 flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setAccountModalOpen(false)}
-                    className="px-4 py-2 text-xs font-semibold text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-50"
+                    disabled={modalSaving}
+                    className="px-4 py-2 rounded-xl border border-[#D1D5DB] text-[#4B5563] hover:bg-neutral-50 font-medium"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
                     disabled={modalSaving}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-neutral-900 rounded-lg hover:bg-neutral-800 disabled:opacity-50"
+                    className="px-5 py-2 rounded-xl bg-[#891523] text-white font-semibold hover:bg-[#720e1a] transition-colors shadow-xs"
                   >
-                    <FloppyDisk size={14} />
                     {modalSaving ? 'Menyimpan...' : 'Simpan Akun'}
                   </button>
                 </div>
@@ -412,70 +455,80 @@ export default function AccountManagementPage() {
 
         {/* Modal Reset Password */}
         {resetModalOpen && resetTargetAccount && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-neutral-200 space-y-4">
-              <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-                <h3 className="text-sm font-bold text-neutral-900">Reset Kata Sandi Akun</h3>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="fixed inset-0 bg-black/40 backdrop-blur-xs"
+              onClick={() => !resetSaving && setResetModalOpen(false)}
+            />
+            <div className="relative max-w-sm w-full bg-white rounded-2xl border border-[#E5E7EB] shadow-2xl p-6 space-y-4 z-10">
+              <div className="flex items-center justify-between pb-3 border-b border-[#E5E7EB]">
+                <h3 className="text-sm font-bold text-[#111827]">
+                  Reset Password Akun
+                </h3>
                 <button
-                  type="button"
                   onClick={() => setResetModalOpen(false)}
-                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-700"
+                  disabled={resetSaving}
+                  className="p-1 text-[#9CA3AF] hover:text-[#4B5563]"
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <div className="p-3 rounded-lg bg-neutral-50 border border-neutral-200 text-xs">
-                Mengatur ulang kata sandi untuk <strong>{resetTargetAccount.fullName}</strong> (
-                {resetTargetAccount.email}).
-              </div>
+              <p className="text-xs text-[#6B7280]">
+                Mengganti password akun untuk <strong>{resetTargetAccount.fullName}</strong> ({resetTargetAccount.email}).
+              </p>
 
               {resetError && (
-                <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-xs">
-                  {resetError}
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
+                  <WarningCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+                  <span>{resetError}</span>
                 </div>
               )}
 
-              <form onSubmit={handleExecuteReset} className="space-y-3.5">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-neutral-700">Kata Sandi Baru *</label>
+              <form onSubmit={handleSaveResetPassword} className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-semibold text-[#374151] mb-1">
+                    PASSWORD BARU
+                  </label>
                   <input
                     type="password"
                     required
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Min. 8 karakter"
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                    placeholder="Minimal 6 karakter"
+                    className="w-full px-3 py-2 rounded-xl border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-neutral-700">Konfirmasi Kata Sandi *</label>
+                <div>
+                  <label className="block font-semibold text-[#374151] mb-1">
+                    KONFIRMASI PASSWORD BARU
+                  </label>
                   <input
                     type="password"
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Ketik ulang kata sandi"
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                    placeholder="Ketik ulang password baru"
+                    className="w-full px-3 py-2 rounded-xl border border-[#D1D5DB] focus:outline-none focus:border-[#891523]"
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-100">
+                <div className="pt-2 flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setResetModalOpen(false)}
-                    className="px-4 py-2 text-xs font-semibold text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-50"
+                    disabled={resetSaving}
+                    className="px-4 py-2 rounded-xl border border-[#D1D5DB] text-[#4B5563] hover:bg-neutral-50 font-medium"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
                     disabled={resetSaving}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-neutral-900 rounded-lg hover:bg-neutral-800 disabled:opacity-50"
+                    className="px-5 py-2 rounded-xl bg-[#891523] text-white font-semibold hover:bg-[#720e1a] transition-colors shadow-xs"
                   >
-                    <Key size={14} />
-                    {resetSaving ? 'Mereset...' : 'Simpan Kata Sandi'}
+                    {resetSaving ? 'Menyimpan...' : 'Ganti Password'}
                   </button>
                 </div>
               </form>

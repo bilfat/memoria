@@ -36,14 +36,14 @@ export const CircularLightRig = React.forwardRef<HTMLDivElement, CircularLightRi
     return (
       <div
         ref={ref}
-        className={`relative w-full max-w-xl mx-auto pointer-events-none select-none ${className}`}
+        className={`relative w-full max-w-xl mx-auto pointer-events-none select-none will-change-[transform,opacity] ${className}`}
       >
         {/* Overhead Golden Ambient Light Dome */}
         <div className="absolute -top-12 inset-x-12 h-36 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#f5d890]/25 via-[#d6b46a]/10 to-transparent blur-xl pointer-events-none" />
 
         <svg
           viewBox="0 0 600 220"
-          className="w-full h-auto overflow-visible drop-shadow-[0_15px_35px_rgba(0,0,0,0.85)]"
+          className="w-full h-auto overflow-visible"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >

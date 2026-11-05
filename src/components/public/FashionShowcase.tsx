@@ -107,54 +107,54 @@ export function FashionShowcase({ event }: FashionShowcaseProps) {
         ease: 'power3.out',
       })
 
-        // =========================================================
-        // SCENE B: Runway Edge Lights Sequential Activation (Back to Front)
-        // =========================================================
-        if (edgeLights && edgeLights.length > 0) {
-          tl.to(
-            edgeLights,
-            {
-              opacity: 1,
-              stagger: {
-                each: 0.05,
-                from: 'start',
-              },
-              duration: 0.6,
-              ease: 'power2.inOut',
-            },
-            '-=0.6'
-          );
-        }
-
-        if (rigBulbs && rigBulbs.length > 0) {
-          tl.to(
-            rigBulbs,
-            {
-              opacity: 1,
-              stagger: {
-                each: 0.04,
-                from: 'center',
-              },
-              duration: 0.5,
-              ease: 'power2.inOut',
-            },
-            '-=0.5'
-          );
-        }
-
-        // =========================================================
-        // SCENE C: Volumetric Runway Spotlights Power Up
-        // =========================================================
+      // =========================================================
+      // SCENE B: Runway Edge Lights Sequential Activation (Back to Front)
+      // =========================================================
+      if (edgeLights && edgeLights.length > 0) {
         tl.to(
-          spotlightsRef.current,
+          edgeLights,
           {
             opacity: 1,
-            scaleY: 1,
-            duration: 0.9,
-            ease: 'power2.out',
+            stagger: {
+              each: 0.05,
+              from: 'start',
+            },
+            duration: 0.6,
+            ease: 'power2.inOut',
           },
-          '-=0.4'
-        )
+          '-=0.6'
+        );
+      }
+
+      if (rigBulbs && rigBulbs.length > 0) {
+        tl.to(
+          rigBulbs,
+          {
+            opacity: 1,
+            stagger: {
+              each: 0.04,
+              from: 'center',
+            },
+            duration: 0.5,
+            ease: 'power2.inOut',
+          },
+          '-=0.5'
+        );
+      }
+
+      // =========================================================
+      // SCENE C: Volumetric Runway Spotlights Power Up
+      // =========================================================
+      tl.to(
+        spotlightsRef.current,
+        {
+          opacity: 1,
+          scaleY: 1,
+          duration: 0.9,
+          ease: 'power2.out',
+        },
+        '-=0.4'
+      )
 
         // =========================================================
         // SCENE D: Model Entrance (Depth Walk down the catwalk)
@@ -194,22 +194,22 @@ export function FashionShowcase({ event }: FashionShowcaseProps) {
           '-=0.4'
         )
 
-        // =========================================================
-        // SCENE F: Editorial Content Reveal
-        // =========================================================
-        if (contentItems && contentItems.length > 0) {
-          tl.to(
-            contentItems,
-            {
-              opacity: 1,
-              y: 0,
-              stagger: 0.12,
-              duration: 0.8,
-              ease: 'power2.out',
-            },
-            '-=0.5'
-          );
-        }
+      // =========================================================
+      // SCENE F: Editorial Content Reveal
+      // =========================================================
+      if (contentItems && contentItems.length > 0) {
+        tl.to(
+          contentItems,
+          {
+            opacity: 1,
+            y: 0,
+            stagger: 0.12,
+            duration: 0.8,
+            ease: 'power2.out',
+          },
+          '-=0.5'
+        );
+      }
     },
     { dependencies: [hasTriggered], scope: containerRef }
   );
@@ -229,18 +229,18 @@ export function FashionShowcase({ event }: FashionShowcaseProps) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
 
           {/* SISI KIRI: ANIMATED RUNWAY STAGE (58% Dominan Visual di Desktop, Atas di Mobile) */}
-          <div className="lg:col-span-7 order-1 lg:order-1 w-full">
+          <div data-scroll-stagger="left" className="lg:col-span-7 order-1 lg:order-1 w-full">
             <FashionStage
               lightingRigRef={lightingRigRef}
               spotlightsRef={spotlightsRef}
               modelRef={modelRef}
               lightSweepRef={lightSweepRef}
-              customImage="/images/fashion-model-clean.png"
+              customImage={event.fashionTeaser?.image || '/images/fashion-model-clean.png'}
             />
           </div>
 
           {/* SISI KANAN: EDITORIAL INFORMATION (42% Area di Desktop, Bawah di Mobile) */}
-          <div className="lg:col-span-5 order-2 lg:order-2 px-2 sm:px-4">
+          <div data-scroll-stagger="right" className="lg:col-span-5 order-2 lg:order-2 px-2 sm:px-4">
             <FashionEditorialContent
               title={event.fashionTeaser?.title || 'The Runway Experience'}
               description={event.fashionTeaser?.description}
