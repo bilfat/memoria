@@ -144,8 +144,23 @@ export default function CheckinPage() {
         return;
       }
 
-      // Kasus 1: Sudah pernah check-in sebelumnya -> Tampilkan popup peringatan langsung
-      if (data.outcome === 'ALREADY_CHECKED_IN' || data.attendee?.isCheckedIn) {
+      // KASUS 1: BERHASIL CHECK-IN BARU (Status sebelumnya belum hadir -> sekarang berhasil hadir!)
+      if (data.outcome === 'CREATED') {
+        setSuccessModal({
+          name: data.attendee.name,
+          ticketName: data.attendee.ticketName,
+          checkedAt: data.attendee.checkedAt || data.attendee.firstCheckedInAt || new Date().toISOString(),
+          operatorName: data.attendee.operatorName || 'Petugas Check-in',
+          targetType: data.attendee.targetType,
+        });
+        setScanResult(null);
+        // Refresh live counter & riwayat di background secara non-blocking
+        loadHistoryData().catch(console.error);
+        return;
+      }
+
+      // KASUS 2: SUDAH CHECK-IN SEBELUMNYA (Tamu sudah pernah hadir -> tampilkan popup peringatan tiket sudah digunakan)
+      if (data.outcome === 'ALREADY_CHECKED_IN' || (!data.resolutionToken && data.attendee?.isCheckedIn)) {
         setAlreadyCheckedModal({
           name: data.attendee.name,
           ticketName: data.attendee.ticketName,
@@ -154,21 +169,6 @@ export default function CheckinPage() {
           targetType: data.attendee.targetType,
         });
         setScanResult(null);
-        return;
-      }
-
-      // Kasus 2: Berhasil check-in baru secara instan dalam 1 roundtrip
-      if (data.outcome === 'CREATED') {
-        setSuccessModal({
-          name: data.attendee.name,
-          ticketName: data.attendee.ticketName,
-          checkedAt: data.attendee.checkedAt || new Date().toISOString(),
-          operatorName: data.attendee.operatorName || 'Petugas Check-in',
-          targetType: data.attendee.targetType,
-        });
-        setScanResult(null);
-        // Refresh live counter & riwayat di background secara non-blocking
-        loadHistoryData().catch(console.error);
         return;
       }
 

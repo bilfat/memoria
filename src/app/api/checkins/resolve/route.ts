@@ -96,8 +96,8 @@ async function handleAutoConfirmOrResolution({
       attendee: {
         ...attendeeBase,
         isCheckedIn: true,
-        firstCheckedInAt: rpcResult.checked_at || new Date().toISOString(),
-        checkedAt: rpcResult.checked_at || new Date().toISOString(),
+        firstCheckedInAt: rpcResult.checkedAt || rpcResult.checked_at || new Date().toISOString(),
+        checkedAt: rpcResult.checkedAt || rpcResult.checked_at || new Date().toISOString(),
         operatorName: staff.fullName || 'Petugas Check-in',
         checkinMethod: normalizedMethod,
         canCheckIn: false,
